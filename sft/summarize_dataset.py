@@ -26,9 +26,9 @@ def get_dataset_from_jsonl(jsonl_file, return_summary=True):
 
 
 class TLDRDataset(Dataset):
-    def __init__(self, train_path, tokenizer, split, max_length=550):
+    def __init__(self, train_path, top_percent, tokenizer, split, max_length=550):
         self.post_list = []
-        dataset = load_dataset(train_path, split=split)
+        dataset = load_dataset(train_path, split="%s[:%d]" % (split, top_percent))
         for sample in dataset:
             self.post_list.append(sample["prompt"] + sample["label"])
         if "valid" in split:

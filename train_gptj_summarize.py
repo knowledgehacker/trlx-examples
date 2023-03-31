@@ -19,8 +19,9 @@ import config as cfg
 
 if __name__ == "__main__":
     output_dir = cfg.SFT_CKPT_DIR
-    train_batch_size = 128
-    gradient_accumulation_steps = 32
+    micro_batch_size = 4
+    batch_size = 128
+    gradient_accumulation_steps = batch_size // micro_batch_size
     learning_rate = 1e-5
     #eval_batch_size = 1
     #eval_steps = 500
@@ -46,6 +47,7 @@ if __name__ == "__main__":
     # Set up the datasets
     train_dataset = TLDRDataset(
         cfg.SUMMARIZATION_DATASET,
+        1,
         tokenizer,
         "train",
         max_length=max_input_length,
@@ -90,12 +92,12 @@ if __name__ == "__main__":
         target_modules=["q_proj", "v_proj"],
         lora_dropout=LORA_DROPOUT,
         bias="none",
-        task_type="CAUSAL_LM",
+        task_type="CAUSAL_LM"
     )
     model = AutoModelForCausalLM.from_pretrained(
         cfg.PT_MODEL,
         load_in_8bit=True,
-        device_map="auto",
+        device_map="auto"
     )
     model = prepare_model_for_int8_training(model)
     model = get_peft_model(model, loraCfg)
@@ -105,7 +107,7 @@ if __name__ == "__main__":
     # Prepare the trainer and start training
     training_args = TrainingArguments(
         learning_rate=learning_rate,
-        per_device_train_batch_size=train_batch_size,
+        per_device_train_batch_size=micro_batch_size,
         #per_device_eval_batch_size=eval_batch_size,
         # evaluation_strategy="steps",
         # eval_accumulation_steps=1,
