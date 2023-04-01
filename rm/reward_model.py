@@ -1,22 +1,26 @@
 import torch
 from torch import nn
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
-import examples.summarize_rlhf.config as cfg
+import config as cfg
+from model_loader import get_tokenizer, prepare_model_with_adapters
 
 
-class GPTRewardModel(nn.Module):
+class OPTRewardModel(nn.Module):
     def __init__(self, model_path):
         super().__init__()
-        model = AutoModelForCausalLM.from_pretrained(model_path)
+        #model = AutoModelForCausalLM.from_pretrained(model_path)
+        model = prepare_model_with_adapters(model_path)
         self.config = model.config
         # `gpt-neo(x)` models use `hidden_size` attribute names instead of `n_embd``
         self.config.n_embd = self.config.hidden_size if hasattr(self.config, "hidden_size") else self.config.n_embd
         self.transformer = model.transformer
         self.v_head = nn.Linear(self.config.n_embd, 1, bias=False)
-        self.tokenizer = AutoTokenizer.from_pretrained(cfg.PT_MODEL)
-        self.tokenizer.pad_token = self.tokenizer.eos_token
+        #self.tokenizer = AutoTokenizer.from_pretrained(cfg.PT_MODEL)
+        #self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.tokenizer = get_tokenizer(cfg.PT_MODEL)
         self.PAD_ID = self.tokenizer(self.tokenizer.pad_token)["input_ids"][0]
+        print("PAD_ID: %s" % self.PAD_ID)
 
     def forward(
         self,

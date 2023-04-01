@@ -3,7 +3,7 @@ from typing import List
 
 import torch
 from datasets import load_dataset
-from reward_model.reward_model import GPTRewardModel
+from rm.reward_model import GPTRewardModel
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
@@ -21,9 +21,9 @@ from trlx.models.modeling_ppo import PPOConfig
 import config as cfg
 
 
-REWARD_CHECKPOINT_PATH = "reward_model/rm_checkpoint/pytorch_model.bin"
+REWARD_CHECKPOINT_PATH = "rm/rm_checkpoint/pytorch_model.bin"
 if not os.path.exists(REWARD_CHECKPOINT_PATH):
-    os.makedirs("reward_model/rm_checkpoint", exist_ok=True)
+    os.makedirs("rm/rm_checkpoint", exist_ok=True)
     os.system(
         f"wget -O {REWARD_CHECKPOINT_PATH} \
         https://huggingface.co/CarperAI/openai_summarize_tldr_rm_checkpoint/resolve/main/pytorch_model.bin"

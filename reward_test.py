@@ -1,18 +1,28 @@
-import os
+import random
 
+import numpy as np
 import torch
 from datasets import load_dataset
-from reward_model.reward_model import GPTRewardModel
+from rm.reward_model import GPTRewardModel
 from torch.utils.data import Dataset
 from tqdm import tqdm
-from transformers import AutoTokenizer, Trainer, TrainingArguments
+from transformers import AutoTokenizer
 
 import config as cfg
 
-#### initialize a reward model from the SFT model and train it to be a pairwise ranker with comparison dataset ####
+
+def set_seed(seed_val=42):
+    random.seed(seed_val)
+    np.random.seed(seed_val)
+    torch.manual_seed(seed_val)
+    torch.cuda.manual_seed_all(seed_val)
+
 
 def create_comparison_dataset(path, split="train"):
     dataset = load_dataset(path, split=split)
+    if split == "test":
+        dataset = dataset.select(range(5000))
+
     pairs = []
     for sample in tqdm(dataset):
         pair = {}
@@ -35,7 +45,7 @@ class PairwiseDataset(Dataset):
         self.chosen_attn_masks = []
         self.rejected_input_ids = []
         self.rejected_attn_masks = []
-        for pair in tqdm(pairs):
+        for pair in pairs:
             chosen, rejected = pair["chosen"], pair["rejected"]
             chosen_encodings_dict = tokenizer(
                 "<|startoftext|>" + chosen + "<|endoftext|>",
@@ -77,76 +87,32 @@ class DataCollatorReward:
         return batch
 
 
-def compute_metrics(eval_preds):
-    chosen_end_scores = eval_preds.predictions[0]  # chosen scores
-    rejected_end_scores = eval_preds.predictions[1]  # rejected scores
-
-    result = {}
-    acc = sum(chosen_end_scores > rejected_end_scores) / len(rejected_end_scores)
-    result["accuracy"] = acc
-
-    return result
-
-
 if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained(cfg.PT_MODEL)
     tokenizer.pad_token = tokenizer.eos_token
+    PAD_ID = tokenizer(tokenizer.pad_token)["input_ids"][0]
 
-    if not os.path.exists(cfg.RM_CKPT_DIR):
-        os.mkdir(cfg.RM_CKPT_DIR)
-
-    training_args = TrainingArguments(
-        output_dir=cfg.RM_CKPT_DIR,
-        num_train_epochs=5,
-        logging_steps=10,
-        gradient_accumulation_steps=4,
-        save_strategy="steps",
-        evaluation_strategy="steps",
-        per_device_train_batch_size=1,
-        per_device_eval_batch_size=1,
-        eval_accumulation_steps=1,
-        eval_steps=500,
-        save_steps=500,
-        warmup_steps=100,
-        logging_dir="./logs",
-        fp16=True,
-        bf16=False,
-        learning_rate=1e-5,
-        deepspeed=cfg.RM_DS_CFG,
-        save_total_limit=1,
-    )
-
-    # TODO: where does cfg.REWARD_MODEL come from?
-    # although we can get the model from HuggingFace hub directly, but we should load the one we trained from checkpoint directory, right?
-    
-    # Initialize the reward model from the (supervised) fine-tuned GPT-J
     model = GPTRewardModel(cfg.REWARD_MODEL)
-
-    # Freeze the first 70% of the hidden layers of the reward model backbone
-    layers = model.transformer.h
-    num_layers = len(layers)
-    num_unfrozen = int(0.3 * num_layers)
-    for layer in layers[:-num_unfrozen]:
-        layer.requires_grad_(False)
-
-    # Create the comparisons datasets
-    data_path = cfg.COMPARISON_DATASET
-    train_pairs = create_comparison_dataset(data_path, "train")
-    val_pairs = create_comparison_dataset(data_path, "test")
-
-    # Make pairwise datasets for training
+    model.load_state_dict(torch.load("%s/pytorch_model.bin" % cfg.RM_CKPT_DIR))
     max_length = 550
-    train_dataset = PairwiseDataset(train_pairs, tokenizer, max_length=max_length)
-    val_dataset = PairwiseDataset(val_pairs, tokenizer, max_length=max_length)
+    val_pairs = create_comparison_dataset(cfg.SUMMARIZATION_DATASET, "test")
+    dev_dataset = PairwiseDataset(val_pairs, tokenizer, max_length=max_length)
 
-    # Create the collator to gather batches of pairwise comparisons
-    data_collator = DataCollatorReward()
+    from torch.utils.data import DataLoader
 
-    Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset,
-        compute_metrics=compute_metrics,
-        eval_dataset=val_dataset,
-        data_collator=data_collator,
-    ).train()
+    dev_dataloader = DataLoader(dev_dataset, shuffle=False, batch_size=6, collate_fn=DataCollatorReward())
+    model.cuda()
+    model.eval()
+    model.half()
+    correct = 0
+    chosen_list = []
+    reject_list = []
+    with torch.no_grad():
+        for step, batch in tqdm(enumerate(dev_dataloader), total=len(dev_dataloader)):
+            for x in batch:
+                batch[x] = batch[x].cuda()
+            outputs = model(**batch)
+            correct += sum(outputs["chosen_end_scores"] > outputs["rejected_end_scores"])
+            chosen_list.append(outputs["chosen_end_scores"].cpu())
+            reject_list.append(outputs["rejected_end_scores"].cpu())
+    print("Total accuracy: ", correct / len(dev_dataset))

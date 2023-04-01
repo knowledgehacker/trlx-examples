@@ -1,11 +1,11 @@
 import random
+import json
 
 #import evaluate
 import numpy as np
 import torch
 from sft.summarize_dataset import TLDRDataset, get_dataset_from_jsonl
 from transformers import (
-    AutoModelForCausalLM,
     AutoTokenizer,
     Trainer,
     TrainingArguments,
@@ -13,9 +13,8 @@ from transformers import (
     DataCollatorForLanguageModeling
 )
 
-from peft import prepare_model_for_int8_training, LoraConfig, get_peft_model
 import config as cfg
-
+from model_loader import get_tokenizer, prepare_peft_model
 
 if __name__ == "__main__":
     output_dir = cfg.SFT_CKPT_DIR
@@ -40,9 +39,7 @@ if __name__ == "__main__":
     model.config.end_token_id = tokenizer.eos_token_id
     model.config.pad_token_id = model.config.eos_token_id
     """
-    tokenizer = AutoTokenizer.from_pretrained(cfg.PT_MODEL,
-                                              padding_side='right',
-                                              use_fast=False)
+    tokenizer = get_tokenizer(cfg.PT_MODEL)
 
     # Set up the datasets
     train_dataset = TLDRDataset(
@@ -82,25 +79,7 @@ if __name__ == "__main__":
 
     # load pretrained model in int8 precision and fine tune using low rank adaption
     #model = AutoModelForCausalLM.from_pretrained(cfg.PT_MODEL, use_cache=False)
-
-    LORA_R = 4
-    LORA_ALPHA = 16
-    LORA_DROPOUT = 0.05
-    loraCfg = LoraConfig(
-        r=LORA_R,
-        lora_alpha=LORA_ALPHA,
-        target_modules=["q_proj", "v_proj"],
-        lora_dropout=LORA_DROPOUT,
-        bias="none",
-        task_type="CAUSAL_LM"
-    )
-    model = AutoModelForCausalLM.from_pretrained(
-        cfg.PT_MODEL,
-        load_in_8bit=True,
-        device_map="auto"
-    )
-    model = prepare_model_for_int8_training(model)
-    model = get_peft_model(model, loraCfg)
+    model = prepare_peft_model(cfg.PT_MODEL)
 
     print("Fine tuning...")
 
@@ -140,4 +119,14 @@ if __name__ == "__main__":
         data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False)
     )
     trainer.train()
+    """
     trainer.save_model(output_dir)
+    
+    with open("%s/config.json" % output_dir, "w") as f:
+        json.dump(model.config.to_dict(), f)
+    """
+    print("Save pretrained to directory %s" % output_dir)
+    model.save_pretrained(output_dir)
+
+    print("Push to hub %s" % cfg.SFT_MODEL)
+    model.push_to_hub(cfg.SFT_MODEL, use_auth_token=True)
