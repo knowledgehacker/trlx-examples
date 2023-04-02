@@ -1,9 +1,5 @@
-import random
-
 #import evaluate
-import numpy as np
-import torch
-from sft.summarize_dataset import TLDRDataset, get_dataset_from_jsonl
+from sft.summarize_dataset import TLDRDataset
 from transformers import (
     #AutoTokenizer,
     Trainer,
@@ -43,7 +39,7 @@ if __name__ == "__main__":
     # Set up the datasets
     train_dataset = TLDRDataset(
         cfg.SUMMARIZATION_DATASET,
-        1000,
+        100,
         tokenizer,
         "train",
         max_length=max_input_length,
@@ -105,7 +101,8 @@ if __name__ == "__main__":
         #deepspeed=cfg.SFT_DS_CFG,
         logging_steps=1,
         output_dir=output_dir,
-        save_total_limit=1
+        save_total_limit=1,
+        report_to="none"
     )
 
     trainer = Trainer(

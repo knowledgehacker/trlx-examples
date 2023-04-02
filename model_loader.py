@@ -1,13 +1,11 @@
-import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import prepare_model_for_int8_training, LoraConfig, get_peft_model
 from peft import PeftModel, PeftConfig
 
 
 def get_tokenizer(model_path):
-    tokenizer = AutoTokenizer.from_pretrained(model_path,
-                                              padding_side='right',
-                                              use_fast=False)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, padding_side='right', use_fast=False)
+
     return tokenizer
 
 
