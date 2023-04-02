@@ -43,14 +43,15 @@ if __name__ == "__main__":
     # Set up the datasets
     train_dataset = TLDRDataset(
         cfg.SUMMARIZATION_DATASET,
-        1,
+        1000,
         tokenizer,
         "train",
         max_length=max_input_length,
     )
     """
     dev_dataset = TLDRDataset(
-        data_path,
+        cfg.SUMMARIZATION_DATASET,
+        1000,
         tokenizer,
         "valid",
         max_length=max_input_length,
