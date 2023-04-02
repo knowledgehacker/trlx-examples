@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from transformers import AutoTokenizer, AutoModelForCausalLM
+#from transformers import AutoTokenizer, AutoModelForCausalLM
 
 import config as cfg
 from model_loader import get_tokenizer, prepare_model_with_adapters
@@ -10,16 +10,22 @@ class OPTRewardModel(nn.Module):
     def __init__(self, model_path):
         super().__init__()
         #model = AutoModelForCausalLM.from_pretrained(model_path)
-        model = prepare_model_with_adapters(model_path)
-        self.config = model.config
+        #self.transformer = model.transformer
+        self.model = prepare_model_with_adapters(model_path)
+        self.config = self.model.config
         # `gpt-neo(x)` models use `hidden_size` attribute names instead of `n_embd``
         self.config.n_embd = self.config.hidden_size if hasattr(self.config, "hidden_size") else self.config.n_embd
-        self.transformer = model.transformer
         self.v_head = nn.Linear(self.config.n_embd, 1, bias=False)
-        #self.tokenizer = AutoTokenizer.from_pretrained(cfg.PT_MODEL)
-        #self.tokenizer.pad_token = self.tokenizer.eos_token
+        """
+        self.tokenizer = AutoTokenizer.from_pretrained(cfg.PT_MODEL)
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        input_tokens = self.tokenizer(self.tokenizer.pad_token)["input_ids"]
+        print("--- input_tokens")
+        print(input_tokens)
+        self.PAD_ID = input_tokens[1]
+        """
         self.tokenizer = get_tokenizer(cfg.PT_MODEL)
-        self.PAD_ID = self.tokenizer(self.tokenizer.pad_token)["input_ids"][0]
+        self.PAD_ID = self.tokenizer.pad_token_id
         print("PAD_ID: %s" % self.PAD_ID)
 
     def forward(
@@ -27,8 +33,8 @@ class OPTRewardModel(nn.Module):
         input_ids=None,
         past_key_values=None,
         attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
+        #token_type_ids=None,
+        #position_ids=None,
         head_mask=None,
         inputs_embeds=None,
         mc_token_ids=None,
@@ -37,20 +43,30 @@ class OPTRewardModel(nn.Module):
         output_attentions=False,
         output_hidden_states=False,
     ):
-        loss = None
+        """
         transformer_outputs = self.transformer(
             input_ids,
             past_key_values=past_key_values,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            position_ids=position_ids,
+            position_ids=position_ids,  # ???
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
         )
 
         hidden_states = transformer_outputs[0]
+        """
 
-        rewards = self.v_head(hidden_states).squeeze(-1)
+        outputs = self.model.forward(input_ids=input_ids,
+                                     attention_mask=attention_mask,
+                                     head_mask=head_mask,
+                                     past_key_values=past_key_values,
+                                     inputs_embeds=inputs_embeds,
+                                     output_hidden_states=True)
+
+        last_hidden_state = outputs.hidden_states[-1]
+
+        rewards = self.v_head(last_hidden_state).squeeze(-1)
         chosen_end_scores = []
         rejected_end_scores = []
 

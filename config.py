@@ -1,18 +1,20 @@
 
 #PT_MODEL = "EleutherAI/gpt-j-6B"
 PT_MODEL = "facebook/opt-2.7b"#"facebook/opt-6.7b"#"decapoda-research/llama-7b-hf"
-PT_DS_CFG = "sft/ds_config_gptj.json"
 
-SFT_MODEL = "mlin/sft_tldr"
+# sft model stuff
+SFT_DS_CFG = "sft/ds_config.json"
 
+#SFT_MODEL = "knowledgehacker/sft_tldr"
 SUMMARIZATION_DATASET = "CarperAI/openai_summarize_tldr"
-SFT_CKPT_DIR = "sft_checkpoint"
+SFT_CKPT_DIR = "sft/checkpoint"
 
-REWARD_MODEL = "CarperAI/rm_tldr"
-RM_DS_CFG = "rm/ds_config_gpt_j.json"
+# reward model stuff
+RM_DS_CFG = "rm/ds_config.json"
 
+#REWARD_MODEL = "CarperAI/rm_tldr"
 COMPARISON_DATASET = "CarperAI/openai_summarize_comparisons"
-RM_CKPT_DIR = "rm_checkpoint"
+RM_CKPT_DIR = "rm/checkpoint"
 
 # load reward model from HuggingFace hub
 RM_CKPT_PATH = "rm/%s/pytorch_model.bin" % RM_CKPT_DIR

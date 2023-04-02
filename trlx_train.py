@@ -3,7 +3,7 @@ from typing import List
 
 import torch
 from datasets import load_dataset
-from rm.reward_model import GPTRewardModel
+from rm.reward_model import OPTRewardModel
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
@@ -19,15 +19,8 @@ from trlx.data.configs import (
 from trlx.models.modeling_ppo import PPOConfig
 
 import config as cfg
+from model_loader import get_tokenizer
 
-
-REWARD_CHECKPOINT_PATH = "rm/rm_checkpoint/pytorch_model.bin"
-if not os.path.exists(REWARD_CHECKPOINT_PATH):
-    os.makedirs("rm/rm_checkpoint", exist_ok=True)
-    os.system(
-        f"wget -O {REWARD_CHECKPOINT_PATH} \
-        https://huggingface.co/CarperAI/openai_summarize_tldr_rm_checkpoint/resolve/main/pytorch_model.bin"
-    )
 
 config = TRLConfig(
     train=TrainConfig(
@@ -41,12 +34,8 @@ config = TRLConfig(
         trainer="AcceleratePPOTrainer",
     ),
     model=ModelConfig(
-        model_path=cfg.SUMMARIZATION_DATASET,
+        model_path=cfg.SFT_CKPT_DIR,
         num_layers_unfrozen=8,
-    ),
-    tokenizer=TokenizerConfig(
-        tokenizer_path="gpt2",
-        truncation_side="right",
     ),
     optimizer=OptimizerConfig(
         name="adamw",
@@ -92,8 +81,8 @@ if __name__ == "__main__":
     # Load the pre-trained reward model
     rw_tokenizer = AutoTokenizer.from_pretrained(cfg.PT_MODEL)
     rw_tokenizer.pad_token = rw_tokenizer.eos_token
-    rw_model = GPTRewardModel(cfg.REWARD_MODEL)
-    rw_model.load_state_dict(torch.load(REWARD_CHECKPOINT_PATH))
+    rw_model = OPTRewardModel(cfg.SFT_CKPT_DIR)
+    rw_model.load_state_dict(torch.load(cfg.RM_CKPT_PATH))
     rw_model.half()
     rw_model.eval()
     rw_device = torch.device("cuda:{}".format(1))  # set reward model device
@@ -154,33 +143,39 @@ if __name__ == "__main__":
         norms_scores = scores - original_scores
         return norms_scores
 
+    """
     tokenizer = AutoTokenizer.from_pretrained(config.tokenizer.tokenizer_path)
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
+    """
+    tokenizer = get_tokenizer(config.tokenizer.tokenizer_path)
+
     max_length_input = config.train.seq_length - config.method.gen_kwargs["max_new_tokens"]
 
     dataset = load_dataset(cfg.SUMMARIZATION_DATASET)
 
     # Store data into prompt and label pairs
     train_set = [(sample["prompt"], sample["label"]) for sample in dataset["train"]]
-    val_set = [(sample["prompt"], sample["label"]) for sample in dataset["valid"]]
+    #val_set = [(sample["prompt"], sample["label"]) for sample in dataset["valid"]]
 
     # Split contents into summaries and labels
     train_posts, train_summaries = zip(*train_set)
-    val_posts, val_summaries = zip(*val_set)
+    #val_posts, val_summaries = zip(*val_set)
 
     # Get the OpenAI summaries
     post_summary_dict = {}
     train_prompts = get_prompt_dataset(train_posts, max_length_input)
+    """
     for i in range(len(train_prompts)):
         post_summary_dict[train_prompts[i]] = train_summaries[i]
     val_prompts = get_prompt_dataset(val_posts, max_length_input)
     for i in range(len(val_prompts)):
         post_summary_dict[val_prompts[i]] = val_summaries[i]
+    """
 
     trainer = trlx.train(
         reward_fn=reward_fn,
         prompts=train_prompts,
-        eval_prompts=val_prompts[0:1000],  # sampling 1000 validation prompts for evaluation speed in training
+        #eval_prompts=val_prompts[0:1000],  # sampling 1000 validation prompts for evaluation speed in training
         config=config,
     )

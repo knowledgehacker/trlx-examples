@@ -2,7 +2,6 @@ import os
 
 import torch
 from datasets import load_dataset
-#from rm.rm import GPTRewardModel
 from rm.reward_model import OPTRewardModel
 from torch.utils.data import Dataset
 from tqdm import tqdm
@@ -101,34 +100,30 @@ if __name__ == "__main__":
 
     print("Load fine-tuned model and initialize reward model using it...")
 
-    # TODO: where does cfg.REWARD_MODEL come from?
-    # although we can get the model from HuggingFace hub directly, but we should load the one we trained from checkpoint directory, right?
-    
     # Initialize the reward model from the (supervised) fine-tuned GPT-J
     #model = GPTRewardModel(cfg.REWARD_MODEL)
     model = OPTRewardModel(cfg.SFT_CKPT_DIR)
 
     print("Train reward model...")
 
+    """
     # Freeze the first 70% of the hidden layers of the reward model backbone
     layers = model.transformer.h
     num_layers = len(layers)
     num_unfrozen = int(0.3 * num_layers)
     for layer in layers[:-num_unfrozen]:
         layer.requires_grad_(False)
+    """
 
     # Create the comparisons datasets
     data_path = cfg.COMPARISON_DATASET
     train_pairs = create_comparison_dataset(data_path, "train")
-    val_pairs = create_comparison_dataset(data_path, "test")
+    #val_pairs = create_comparison_dataset(data_path, "test")
 
     # Make pairwise datasets for training
     max_length = 550
     train_dataset = PairwiseDataset(train_pairs, tokenizer, max_length=max_length)
-    val_dataset = PairwiseDataset(val_pairs, tokenizer, max_length=max_length)
-
-    # Create the collator to gather batches of pairwise comparisons
-    data_collator = DataCollatorReward()
+    #val_dataset = PairwiseDataset(val_pairs, tokenizer, max_length=max_length)
 
     training_args = TrainingArguments(
         output_dir=cfg.RM_CKPT_DIR,
@@ -136,7 +131,7 @@ if __name__ == "__main__":
         logging_steps=10,
         gradient_accumulation_steps=4,
         save_strategy="steps",
-        evaluation_strategy="steps",
+        #evaluation_strategy="steps",
         per_device_train_batch_size=1,
         #per_device_eval_batch_size=1,
         #eval_accumulation_steps=1,
@@ -157,5 +152,5 @@ if __name__ == "__main__":
         train_dataset=train_dataset,
         #compute_metrics=compute_metrics,
         #eval_dataset=val_dataset,
-        data_collator=data_collator,
+        data_collator=DataCollatorReward()
     ).train()

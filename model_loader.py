@@ -11,9 +11,10 @@ def get_tokenizer(model_path):
     return tokenizer
 
 
-def load_pretrained_model(model_path):
+def load_pretrained_model(model_path, return_dict=False):
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
+        return_dict=return_dict,
         load_in_8bit=True,
         device_map="auto"
     )
@@ -49,7 +50,7 @@ def prepare_model_with_adapters(adapter_path):
         torch_dtype=torch.float16,
     )
     """
-    model = load_pretrained_model(peft_config.base_model_name_or_path)
+    model = load_pretrained_model(peft_config.base_model_name_or_path, True)
     model = PeftModel.from_pretrained(model, adapter_path)
 
     return model

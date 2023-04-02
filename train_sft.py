@@ -1,12 +1,11 @@
 import random
-import json
 
 #import evaluate
 import numpy as np
 import torch
 from sft.summarize_dataset import TLDRDataset, get_dataset_from_jsonl
 from transformers import (
-    AutoTokenizer,
+    #AutoTokenizer,
     Trainer,
     TrainingArguments,
     #default_data_collator,
@@ -24,9 +23,9 @@ if __name__ == "__main__":
     learning_rate = 1e-5
     #eval_batch_size = 1
     #eval_steps = 500
-    max_input_length = 200#550
+    max_input_length = 550
     save_steps = 100#1000
-    num_train_epochs = 3#5
+    num_train_epochs = 5
     #random.seed(42)
 
     print("Load dataset and tokenize...")
@@ -102,7 +101,7 @@ if __name__ == "__main__":
         # eval_steps=eval_steps,
         #load_best_model_at_end=True,
         #logging_steps=50,
-        #deepspeed=cfg.PT_DS_CFG,
+        #deepspeed=cfg.SFT_DS_CFG,
         logging_steps=1,
         output_dir=output_dir,
         save_total_limit=1
@@ -117,16 +116,10 @@ if __name__ == "__main__":
         #data_collator=default_data_collator,
         #preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False)
-    )
-    trainer.train()
-    """
-    trainer.save_model(output_dir)
-    
-    with open("%s/config.json" % output_dir, "w") as f:
-        json.dump(model.config.to_dict(), f)
-    """
+    ).train()
+
     print("Save pretrained to directory %s" % output_dir)
     model.save_pretrained(output_dir)
 
-    print("Push to hub %s" % cfg.SFT_MODEL)
-    model.push_to_hub(cfg.SFT_MODEL, use_auth_token=True)
+    #print("Push to hub %s" % cfg.SFT_MODEL)
+    #model.push_to_hub(cfg.SFT_MODEL, use_auth_token=True)
