@@ -78,12 +78,15 @@ if __name__ == "__main__":
         report_to="none"
     )
 
-    Trainer(
+    trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
         #compute_metrics=compute_metrics,
         #eval_dataset=val_dataset,
         data_collator=DataCollatorReward()
-    ).train()
+    )
+    trainer.train()
 
+    print("Save reward model to directory %s" % output_dir)
+    trainer.save_model(output_dir)

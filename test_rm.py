@@ -18,6 +18,7 @@ if __name__ == "__main__":
     PAD_ID = tokenizer.pad_token_id
     print("PAD_ID: %s" % PAD_ID)
 
+    # TODO: how to save rm model to cfg.RM_CKPT_PATH?
     model = OPTRewardModel(cfg.SFT_CKPT_DIR)
     model.load_state_dict(torch.load(cfg.RM_CKPT_PATH))
     max_length = 550

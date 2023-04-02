@@ -14,7 +14,7 @@ RM_DS_CFG = "rm/ds_config.json"
 
 #REWARD_MODEL = "CarperAI/rm_tldr"
 COMPARISON_DATASET = "CarperAI/openai_summarize_comparisons"
-RM_CKPT_DIR = "rm/checkpoint"
+RM_CKPT_DIR = "/content/rm/checkpoint"
 
 # load reward model from HuggingFace hub
 RM_CKPT_PATH = "%s/pytorch_model.bin" % RM_CKPT_DIR

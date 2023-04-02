@@ -114,9 +114,10 @@ if __name__ == "__main__":
         #data_collator=default_data_collator,
         #preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False)
-    ).train()
+    )
+    trainer.train()
 
-    print("Save pretrained to directory %s" % output_dir)
+    print("Save adapters to directory %s" % output_dir)
     model.save_pretrained(output_dir)
 
     #print("Push to hub %s" % cfg.SFT_MODEL)
