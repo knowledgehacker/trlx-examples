@@ -1,80 +1,15 @@
 import os
 
 import torch
-from datasets import load_dataset
 from rm.reward_model import OPTRewardModel
-from torch.utils.data import Dataset
-from tqdm import tqdm
+#from tqdm import tqdm
 from transformers import AutoTokenizer, Trainer, TrainingArguments
 
 import config as cfg
+from rm.comparison_dataset import create_comparison_dataset, PairwiseDataset, DataCollatorReward
+from model_loader import get_tokenizer
 
 #### initialize a reward model from the SFT model and train it to be a pairwise ranker with comparison dataset ####
-
-def create_comparison_dataset(path, split="train"):
-    dataset = load_dataset(path, split=split)
-    pairs = []
-    for sample in tqdm(dataset):
-        pair = {}
-        prompt = sample["prompt"]
-        chosen_summary = sample["chosen"]
-        rejected_summary = sample["rejected"]
-        if chosen_summary == rejected_summary:
-            continue
-        if len(chosen_summary.split()) < 5 or len(rejected_summary.split()) < 5:
-            continue
-        pair["chosen"] = prompt + "\n" + chosen_summary
-        pair["rejected"] = prompt + "\n" + rejected_summary
-        pairs.append(pair)
-    return pairs
-
-
-class PairwiseDataset(Dataset):
-    def __init__(self, pairs, tokenizer, max_length):
-        self.chosen_input_ids = []
-        self.chosen_attn_masks = []
-        self.rejected_input_ids = []
-        self.rejected_attn_masks = []
-        for pair in tqdm(pairs):
-            chosen, rejected = pair["chosen"], pair["rejected"]
-            chosen_encodings_dict = tokenizer(
-                "<|startoftext|>" + chosen + "<|endoftext|>",
-                truncation=True,
-                max_length=max_length,
-                padding="max_length",
-                return_tensors="pt",
-            )
-            rejected_encodings_dict = tokenizer(
-                "<|startoftext|>" + rejected + "<|endoftext|>",
-                truncation=True,
-                max_length=max_length,
-                padding="max_length",
-                return_tensors="pt",
-            )
-            self.chosen_input_ids.append(chosen_encodings_dict["input_ids"])
-            self.chosen_attn_masks.append(chosen_encodings_dict["attention_mask"])
-            self.rejected_input_ids.append(rejected_encodings_dict["input_ids"])
-            self.rejected_attn_masks.append(rejected_encodings_dict["attention_mask"])
-
-    def __len__(self):
-        return len(self.chosen_input_ids)
-
-    def __getitem__(self, idx):
-        return (
-            self.chosen_input_ids[idx],
-            self.chosen_attn_masks[idx],
-            self.rejected_input_ids[idx],
-            self.rejected_attn_masks[idx],
-        )
-
-
-class DataCollatorReward:
-    def __call__(self, data):
-        batch = {}
-        batch["input_ids"] = torch.cat([f[0] for f in data] + [f[2] for f in data])
-        batch["attention_mask"] = torch.cat([f[1] for f in data] + [f[3] for f in data])
-        batch["labels"] = torch.tensor([0] * len(data) + [1] * len(data))
-        return batch
 
 
 def compute_metrics(eval_preds):
@@ -89,14 +24,10 @@ def compute_metrics(eval_preds):
 
 
 if __name__ == "__main__":
+    output_dir = cfg.RM_CKPT_DIR
     #tokenizer = AutoTokenizer.from_pretrained(cfg.PT_MODEL)
     #tokenizer.pad_token = tokenizer.eos_token
-    tokenizer = AutoTokenizer.from_pretrained(cfg.PT_MODEL,
-                                              padding_side='right',
-                                              use_fast=False)
-
-    if not os.path.exists(cfg.RM_CKPT_DIR):
-        os.mkdir(cfg.RM_CKPT_DIR)
+    tokenizer = get_tokenizer(cfg.PT_MODEL)
 
     print("Load fine-tuned model and initialize reward model using it...")
 
@@ -117,7 +48,7 @@ if __name__ == "__main__":
 
     # Create the comparisons datasets
     data_path = cfg.COMPARISON_DATASET
-    train_pairs = create_comparison_dataset(data_path, "train")
+    train_pairs = create_comparison_dataset(data_path, 100, "train")
     #val_pairs = create_comparison_dataset(data_path, "test")
 
     # Make pairwise datasets for training
@@ -126,7 +57,7 @@ if __name__ == "__main__":
     #val_dataset = PairwiseDataset(val_pairs, tokenizer, max_length=max_length)
 
     training_args = TrainingArguments(
-        output_dir=cfg.RM_CKPT_DIR,
+        output_dir=output_dir,
         num_train_epochs=5,
         logging_steps=10,
         gradient_accumulation_steps=4,
@@ -144,6 +75,7 @@ if __name__ == "__main__":
         learning_rate=1e-5,
         #deepspeed=cfg.RM_DS_CFG,
         save_total_limit=1,
+        report_to="none"
     )
 
     Trainer(
@@ -154,3 +86,4 @@ if __name__ == "__main__":
         #eval_dataset=val_dataset,
         data_collator=DataCollatorReward()
     ).train()
+

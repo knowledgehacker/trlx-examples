@@ -21,7 +21,7 @@ if __name__ == "__main__":
     model = OPTRewardModel(cfg.SFT_CKPT_DIR)
     model.load_state_dict(torch.load(cfg.RM_CKPT_PATH))
     max_length = 550
-    val_pairs = create_comparison_dataset(cfg.SUMMARIZATION_DATASET, 1000, "test")
+    val_pairs = create_comparison_dataset(cfg.SUMMARIZATION_DATASET, 10, "test")
     dev_dataset = PairwiseDataset(val_pairs, tokenizer, max_length=max_length)
 
     from torch.utils.data import DataLoader

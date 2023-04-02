@@ -17,4 +17,4 @@ COMPARISON_DATASET = "CarperAI/openai_summarize_comparisons"
 RM_CKPT_DIR = "rm/checkpoint"
 
 # load reward model from HuggingFace hub
-RM_CKPT_PATH = "rm/%s/pytorch_model.bin" % RM_CKPT_DIR
+RM_CKPT_PATH = "%s/pytorch_model.bin" % RM_CKPT_DIR
