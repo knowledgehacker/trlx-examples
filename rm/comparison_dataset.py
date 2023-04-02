@@ -8,9 +8,7 @@ from tqdm import tqdm
 
 
 def create_comparison_dataset(path, top_n, split="train"):
-    #dataset = load_dataset(path, split="%s[:%d]" % (split, top_percent))
-    dataset = load_dataset(path, split=split)
-    dataset = dataset.select(range(top_n))
+    dataset = load_dataset(path, split="%s[:%d]" % (split, top_n))
 
     pairs = []
     for sample in tqdm(dataset):

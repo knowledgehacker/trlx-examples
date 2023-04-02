@@ -57,14 +57,14 @@ class OPTRewardModel(nn.Module):
         hidden_states = transformer_outputs[0]
         """
 
-        outputs = self.model.forward(input_ids=input_ids,
-                                     attention_mask=attention_mask,
-                                     head_mask=head_mask,
-                                     past_key_values=past_key_values,
-                                     inputs_embeds=inputs_embeds,
-                                     output_hidden_states=True)
+        outputs = self.model(input_ids=input_ids,
+                             attention_mask=attention_mask,
+                             head_mask=head_mask,
+                             past_key_values=past_key_values,
+                             inputs_embeds=inputs_embeds,
+                             output_hidden_states=True)
 
-        last_hidden_state = outputs.hidden_states[-1]
+        last_hidden_state = outputs.hidden_states[-1].float()
 
         rewards = self.v_head(last_hidden_state).squeeze(-1)
         chosen_end_scores = []

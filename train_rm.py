@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
     # Create the comparisons datasets
     data_path = cfg.COMPARISON_DATASET
-    train_pairs = create_comparison_dataset(data_path, 100, "train")
+    train_pairs = create_comparison_dataset(data_path, 10, "train")
     #val_pairs = create_comparison_dataset(data_path, "test")
 
     # Make pairwise datasets for training
@@ -71,7 +71,6 @@ if __name__ == "__main__":
         warmup_steps=100,
         logging_dir="./logs",
         fp16=True,
-        bf16=False,
         learning_rate=1e-5,
         #deepspeed=cfg.RM_DS_CFG,
         save_total_limit=1,

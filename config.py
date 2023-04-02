@@ -13,6 +13,7 @@ SFT_CKPT_DIR = "sft/checkpoint"
 RM_DS_CFG = "rm/ds_config.json"
 
 #REWARD_MODEL = "CarperAI/rm_tldr"
+# https://huggingface.co/datasets/CarperAI/openai_summarize_comparisons
 COMPARISON_DATASET = "CarperAI/openai_summarize_comparisons"
 RM_CKPT_DIR = "/content/rm/checkpoint"
 
