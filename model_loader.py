@@ -1,4 +1,6 @@
+import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
+import peft
 from peft import prepare_model_for_int8_training, LoraConfig, get_peft_model
 from peft import PeftModel, PeftConfig
 
@@ -9,7 +11,7 @@ def get_tokenizer(model_path):
     return tokenizer
 
 
-def load_pretrained_model(model_path, return_dict=False):
+def load_pretrained_model(model_path, return_dict=True):
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         return_dict=return_dict,
@@ -39,7 +41,7 @@ def prepare_peft_model(model_path):
     return model
 
 
-def prepare_model_with_adapters(adapter_path):
+def prepare_merged_model(adapter_path):
     peft_config = PeftConfig.from_pretrained(adapter_path)
     """
     model = AutoModelForCausalLM.from_pretrained(
@@ -48,7 +50,26 @@ def prepare_model_with_adapters(adapter_path):
         torch_dtype=torch.float16,
     )
     """
-    model = load_pretrained_model(peft_config.base_model_name_or_path, True)
-    model = PeftModel.from_pretrained(model, adapter_path)
+    model = load_pretrained_model(peft_config.base_model_name_or_path)
+
+    # merge with adapter layers
+    model = merge_model_with_adapters(model, adapter_path)
 
     return model
+
+
+def merge_model_with_adapters(model, adapter_path):
+    model = PeftModel.from_pretrained(model, adapter_path)
+    model.eval()
+
+    lora_model = model.base_model
+    key_list = [key for key, _ in lora_model.model.named_modules() if "lora" not in key]
+    for key in key_list:
+        parent, target, target_name = lora_model._get_submodules(key)
+        if isinstance(target, peft.tuners.lora.Linear):
+            bias = target.bias is not None
+            new_module = torch.nn.Linear(target.in_features, target.out_features, bias=bias)
+            lora_model._replace_module(parent, target_name, new_module, target)
+
+    return lora_model.model
+

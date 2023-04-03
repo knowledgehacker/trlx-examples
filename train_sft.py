@@ -9,7 +9,7 @@ from transformers import (
 )
 
 import config as cfg
-from model_loader import get_tokenizer, prepare_peft_model
+from model_loader import get_tokenizer, prepare_peft_model, prepare_merged_model, merge_model_with_adapters
 
 if __name__ == "__main__":
     output_dir = cfg.SFT_CKPT_DIR
@@ -120,5 +120,8 @@ if __name__ == "__main__":
     print("Save adapters to directory %s" % output_dir)
     model.save_pretrained(output_dir)
 
-    #print("Push to hub %s" % cfg.SFT_MODEL)
-    #model.push_to_hub(cfg.SFT_MODEL, use_auth_token=True)
+    print("Push to hub %s" % cfg.SFT_MODEL)
+
+    # model is a PeftModel, model.base_model is a LoraModel, model.base_model.model is the underlying pre-trained model
+    sft_model = merge_model_with_adapters(model.base_model.model, output_dir)
+    sft_model.push_to_hub(cfg.SFT_MODEL, use_auth_token=True)

@@ -89,3 +89,7 @@ if __name__ == "__main__":
 
     print("Save reward model to directory %s" % output_dir)
     trainer.save_model(output_dir)
+    """
+    print("Push to hub %s" % cfg.REWARD_MODEL)
+    model.push_to_hub(cfg.REWARD_MODEL, use_auth_token=True)
+    """
