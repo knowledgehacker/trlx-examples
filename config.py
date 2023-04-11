@@ -1,6 +1,6 @@
 
 #PT_MODEL = "EleutherAI/gpt-j-6B"
-PT_MODEL = "facebook/opt-2.7b"#"facebook/opt-6.7b"#"decapoda-research/llama-7b-hf"
+PT_MODEL = "facebook/opt-2.7b"#"facebook/opt-6.7b"
 
 # sft model stuff
 SFT_DS_CFG = "sft/ds_config.json"
@@ -8,6 +8,8 @@ SFT_DS_CFG = "sft/ds_config.json"
 SFT_MODEL = "knowledgehacker/sft_tldr"
 SUMMARIZATION_DATASET = "CarperAI/openai_summarize_tldr"
 SFT_CKPT_DIR = "sft/checkpoint"
+
+MAX_SUM_LEN = 550
 
 # reward model stuff
 RM_DS_CFG = "rm/ds_config.json"

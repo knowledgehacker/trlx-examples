@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 import config as cfg
 from rm.comparison_dataset import create_comparison_dataset, PairwiseDataset, DataCollatorReward
-from model_loader import get_tokenizer
+from model_loader import get_tokenizer, prepare_merged_model
 
 
 if __name__ == "__main__":
@@ -16,13 +16,13 @@ if __name__ == "__main__":
     """
     tokenizer = get_tokenizer(cfg.PT_MODEL)
 
-    model = OPTRewardModel(cfg.SFT_CKPT_DIR)
+    sft_model = prepare_merged_model(cfg.SFT_CKPT_DIR)
+    model = OPTRewardModel(sft_model)
     model.load_state_dict(torch.load(cfg.RM_CKPT_PATH))
     model.eval()
 
-    max_length = 550
     val_pairs = create_comparison_dataset(cfg.COMPARISON_DATASET, 10, "test")
-    dev_dataset = PairwiseDataset(val_pairs, tokenizer, max_length=max_length)
+    dev_dataset = PairwiseDataset(val_pairs, tokenizer, max_length=cfg.MAX_SUM_LEN)
 
     from torch.utils.data import DataLoader
 

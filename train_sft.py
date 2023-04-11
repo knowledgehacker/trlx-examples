@@ -9,7 +9,7 @@ from transformers import (
 )
 
 import config as cfg
-from model_loader import get_tokenizer, prepare_peft_model, prepare_merged_model, merge_model_with_adapters
+from model_loader import get_tokenizer, prepare_peft_model_for_training#, merge_adapter_layers
 
 if __name__ == "__main__":
     output_dir = cfg.SFT_CKPT_DIR
@@ -19,7 +19,6 @@ if __name__ == "__main__":
     learning_rate = 1e-5
     #eval_batch_size = 1
     #eval_steps = 500
-    max_input_length = 550
     save_steps = 100#1000
     num_train_epochs = 5
     #random.seed(42)
@@ -39,10 +38,10 @@ if __name__ == "__main__":
     # Set up the datasets
     train_dataset = TLDRDataset(
         cfg.SUMMARIZATION_DATASET,
-        100,
+        10,
         tokenizer,
         "train",
-        max_length=max_input_length,
+        max_length=cfg.MAX_SUM_LEN,
     )
     """
     dev_dataset = TLDRDataset(
@@ -75,7 +74,7 @@ if __name__ == "__main__":
 
     # load pretrained model in int8 precision and fine tune using low rank adaption
     #model = AutoModelForCausalLM.from_pretrained(cfg.PT_MODEL, use_cache=False)
-    model = prepare_peft_model(cfg.PT_MODEL)
+    model = prepare_peft_model_for_training(cfg.PT_MODEL)
 
     print("Fine tuning...")
 
@@ -119,9 +118,9 @@ if __name__ == "__main__":
 
     print("Save adapters to directory %s" % output_dir)
     model.save_pretrained(output_dir)
-
+    """
     print("Push to hub %s" % cfg.SFT_MODEL)
-
     # model is a PeftModel, model.base_model is a LoraModel, model.base_model.model is the underlying pre-trained model
-    sft_model = merge_model_with_adapters(model.base_model.model, output_dir)
+    sft_model = merge_adapter_layers(model, output_dir)
     sft_model.push_to_hub(cfg.SFT_MODEL, use_auth_token=True)
+    """

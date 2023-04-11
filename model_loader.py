@@ -1,7 +1,8 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import peft
-from peft import prepare_model_for_int8_training, LoraConfig, get_peft_model
+from peft.utils.other import prepare_model_for_int8_training, _get_submodules
+from peft import LoraConfig, get_peft_model
 from peft import PeftModel, PeftConfig
 
 
@@ -22,7 +23,7 @@ def load_pretrained_model(model_path, return_dict=True):
     return model
 
 
-def prepare_peft_model(model_path):
+def prepare_peft_model_for_training(model_path):
     LORA_R = 4
     LORA_ALPHA = 16
     LORA_DROPOUT = 0.05
@@ -41,7 +42,7 @@ def prepare_peft_model(model_path):
     return model
 
 
-def prepare_merged_model(adapter_path):
+def load_peft_model(adapter_path):
     peft_config = PeftConfig.from_pretrained(adapter_path)
     """
     model = AutoModelForCausalLM.from_pretrained(
@@ -50,22 +51,21 @@ def prepare_merged_model(adapter_path):
         torch_dtype=torch.float16,
     )
     """
+
     model = load_pretrained_model(peft_config.base_model_name_or_path)
 
-    # merge with adapter layers
-    model = merge_model_with_adapters(model, adapter_path)
+    model = PeftModel.from_pretrained(model, adapter_path)
+    model.eval()    # TODO: is it mandatory?
 
     return model
 
 
-def merge_model_with_adapters(model, adapter_path):
-    model = PeftModel.from_pretrained(model, adapter_path)
-    model.eval()
-
+# TODO: merge the adapter layers into the base model’s weights, what does it mean really?
+def merge_adapter_layers(model):
     lora_model = model.base_model
-    key_list = [key for key, _ in lora_model.model.named_modules() if "lora" not in key]
+    key_list = [key for key, _ in lora_model.named_modules() if "lora" not in key]
     for key in key_list:
-        parent, target, target_name = lora_model._get_submodules(key)
+        parent, target, target_name = _get_submodules(lora_model, key)
         if isinstance(target, peft.tuners.lora.Linear):
             bias = target.bias is not None
             new_module = torch.nn.Linear(target.in_features, target.out_features, bias=bias)
@@ -73,3 +73,11 @@ def merge_model_with_adapters(model, adapter_path):
 
     return lora_model.model
 
+
+def prepare_merged_model(adapter_path):
+    model = load_peft_model(adapter_path)
+
+    # merge the adapter layers into the base model’s weights
+    model = merge_adapter_layers(model)
+
+    return model

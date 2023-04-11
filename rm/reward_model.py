@@ -7,11 +7,14 @@ from model_loader import get_tokenizer, prepare_merged_model
 
 
 class OPTRewardModel(nn.Module):
-    def __init__(self, model_path):
+    def __init__(self, model):
         super().__init__()
-        #model = AutoModelForCausalLM.from_pretrained(model_path)
-        #self.transformer = model.transformer
-        self.model = prepare_merged_model(model_path)    # = AutoModelForCausalLM.from_pretrained(cfg.SFT_MODEL)
+        """
+        model = AutoModelForCausalLM.from_pretrained(model_path)
+        self.transformer = model.transformer
+        """
+        #self.model = prepare_merged_model(model_path)    # = AutoModelForCausalLM.from_pretrained(cfg.SFT_MODEL)
+        self.model = model
         self.config = self.model.config
         # `gpt-neo(x)` models use `hidden_size` attribute names instead of `n_embd``
         self.config.n_embd = self.config.hidden_size if hasattr(self.config, "hidden_size") else self.config.n_embd

@@ -1,17 +1,14 @@
-import os
-
 import torch
-from rm.reward_model import OPTRewardModel
-#from tqdm import tqdm
 from transformers import AutoTokenizer, Trainer, TrainingArguments
 
 import config as cfg
+from model_loader import get_tokenizer, prepare_merged_model
 from rm.comparison_dataset import create_comparison_dataset, PairwiseDataset, DataCollatorReward
-from model_loader import get_tokenizer
+from rm.reward_model import OPTRewardModel
 
 #### initialize a reward model from the SFT model and train it to be a pairwise ranker with comparison dataset ####
 
-
+"""
 def compute_metrics(eval_preds):
     chosen_end_scores = eval_preds.predictions[0]  # chosen scores
     rejected_end_scores = eval_preds.predictions[1]  # rejected scores
@@ -21,7 +18,7 @@ def compute_metrics(eval_preds):
     result["accuracy"] = acc
 
     return result
-
+"""
 
 if __name__ == "__main__":
     output_dir = cfg.RM_CKPT_DIR
@@ -32,8 +29,9 @@ if __name__ == "__main__":
     print("Load fine-tuned model and initialize reward model using it...")
 
     # Initialize the reward model from the (supervised) fine-tuned GPT-J
-    #model = GPTRewardModel(cfg.REWARD_MODEL)
-    model = OPTRewardModel(cfg.SFT_CKPT_DIR)
+    #model = OPTRewardModel(cfg.SFT_CKPT_DIR)
+    sft_model = prepare_merged_model(cfg.SFT_CKPT_DIR)
+    model = OPTRewardModel(sft_model)
 
     print("Train reward model...")
 
@@ -52,8 +50,7 @@ if __name__ == "__main__":
     #val_pairs = create_comparison_dataset(data_path, "test")
 
     # Make pairwise datasets for training
-    max_length = 550
-    train_dataset = PairwiseDataset(train_pairs, tokenizer, max_length=max_length)
+    train_dataset = PairwiseDataset(train_pairs, tokenizer, max_length=cfg.MAX_SUM_LEN)
     #val_dataset = PairwiseDataset(val_pairs, tokenizer, max_length=max_length)
 
     training_args = TrainingArguments(
