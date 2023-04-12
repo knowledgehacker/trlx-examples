@@ -6,7 +6,7 @@ from tqdm import tqdm
 #from transformers import pipeline
 
 from trl import AutoModelForCausalLMWithValueHead, PPOConfig, PPOTrainer
-from trl.core import LengthSampler
+#from trl.core import LengthSampler
 
 import config as cfg
 from model_loader import get_tokenizer, load_peft_model, merge_adapter_layers
@@ -20,59 +20,28 @@ tokenizer = get_tokenizer(cfg.PT_MODEL)
 print(">> Build dataset...")
 
 
-#Get the prompt after decoding to make sure dictionary of prompts and summaries is consistent
 # Note that in class TLDRDataset defined in summarize_dataset.py concatenates prompt and label when initializing
 def format_prompt(sample, max_length):
-    """
-    tmp = tokenizer.decode(
-        tokenizer(sample["query"].split("TL;DR:")[0],
-                  truncation=True,
-                  padding="max_length",
-                  max_length=max_length - 5,  # to make sure "TL;DR" don't get truncated
-                  add_special_tokens=False)["input_ids"],
-        skip_special_tokens=True, ).strip()
-    tmp = tmp + "\nTL;DR:"
-    encodings_dict = tokenizer(tmp,
-                                    truncation=True,
-                                    padding="max_length",
-                                    max_length=max_length,
-                                    add_special_tokens=False)
-    """
     encodings_dict = tokenizer(sample["query"].split("TL;DR:")[0] + "\nTL;DR:",
                                truncation=True,
                                padding="max_length",
                                max_length=max_length,
                                add_special_tokens=False)
-    sample["input_ids"] = torch.tensor(encodings_dict["input_ids"])
+    #sample["input_ids"] = torch.tensor(encodings_dict["input_ids"])
+    sample["input_ids"] = encodings_dict["input_ids"]
     sample["query"] = tokenizer.decode(encodings_dict["input_ids"], skip_special_tokens=True, ).strip()
 
     return sample
 
 
-def check(sample):
-    print(sample)
-
-    return sample
-
-
-def build_dataset(name, top_n, split, max_length):
+def build_dataset(name, top_n, split, max_input_len):
     ds = load_dataset(name, split="%s[:%d]" % (split, top_n))
-    # rename prompt to query, otherwise prompt column will be removed, it can't be used later
+    # rename prompt to query, otherwise prompt column will be removed, and it can't be used later
     ds = ds.rename_columns({"prompt": "query"})
-    ds = ds.map(lambda sample: format_prompt(sample, max_length), batched=False)
+    ds = ds.map(lambda sample: format_prompt(sample, max_input_len), batched=False)
     ds.set_format(type="torch")
 
-    return ds
-
-
-# TODO: max_new_tokens for PPO trainer
-max_new_tokens = 50
-max_input_len = cfg.MAX_SUM_LEN - max_new_tokens
-train_dataset = build_dataset(cfg.SUMMARIZATION_DATASET, 2, "train", max_input_len)
-#train_dataset = train_dataset.map(check)
-
-
-def post_process(ds):
+    # map prompt to summarization
     prompt_summary_dict = {}
 
     content = [(sample["query"], sample["label"]) for sample in ds]
@@ -80,10 +49,11 @@ def post_process(ds):
     for i in range(len(prompts)):
         prompt_summary_dict[prompts[i]] = summaries[i]
 
-    return prompt_summary_dict
+    return ds, prompt_summary_dict
 
 
-train_prompt_summary_dict = post_process(train_dataset)
+max_input_len = cfg.MAX_SUM_LEN - cfg.MAX_NEW_TOKENS
+train_dataset, train_prompt_summary_dict = build_dataset(cfg.SUMMARIZATION_DATASET, 2, "train", max_input_len)
 
 
 # collator
@@ -95,11 +65,10 @@ def collator(data):
 print(">> Prepare model...")
 
 #sft_model = prepare_merged_model(cfg.SFT_CKPT_DIR)
-#sft_model = load_peft_model(cfg.SFT_MODEL)
 sft_model = load_peft_model(cfg.SFT_CKPT_DIR)
 pretrained_model = merge_adapter_layers(sft_model)
 model = AutoModelForCausalLMWithValueHead.from_pretrained(pretrained_model)
-# TODO: it seems in trl library, if model is a peft one, no implicit ref_model will be created automatically, so we need to pass one.
+# construct reference model
 sft_model.disable_adapter()
 ref_pretrained_model = sft_model.base_model.model
 ref_model = AutoModelForCausalLMWithValueHead.from_pretrained(ref_pretrained_model)
@@ -116,9 +85,6 @@ config = PPOConfig(
     batch_size=2,#128,
     gradient_accumulation_steps=1,
 )
-
-#sent_kwargs = {"return_all_scores": True, "function_to_apply": "none", "batch_size": config.mini_batch_size}
-
 
 # optimizer
 optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.learning_rate)
@@ -165,7 +131,6 @@ def get_scores(samples: List[str]):
             sub_scores = reward_model(input_ids=input_ids, attention_mask=attn_masks)
         score_list.append(sub_scores["chosen_end_scores"])
     scores = torch.cat(score_list, dim=0)
-    print("--- scores")
     print(scores)
 
     return scores
@@ -174,7 +139,9 @@ def get_scores(samples: List[str]):
 def reward_fn(samples: List[str], **kwargs):
     original_samples = [text.split("TL;DR:")[0] + "TL;DR: " for text in samples]
     original_samples = [text + train_prompt_summary_dict[text.strip()] for text in original_samples]
+    print("--- original_scores")
     original_scores = get_scores(original_samples)
+    print("--- scores")
     scores = get_scores(samples)
     norms_scores = [score - original_score for score, original_score in zip(scores, original_scores)]
     return norms_scores
@@ -182,15 +149,15 @@ def reward_fn(samples: List[str], **kwargs):
 
 # We then define the arguments to pass to the `generate` function of the PPOTrainer,
 # which is a wrapper around the `generate` function of the trained model.
+# pad_token = '<pad>', id = 1; unk_token = bos_token = eos_token = '/s', id = 2; sep_token not supported;
+# for model 'facebook/opt-6.7b'
 generation_kwargs = {
-    "do_sample": True,
+    #"do_sample": True,  # sample a response from top k probabilities
+    "max_new_tokens": cfg.MAX_NEW_TOKENS,
     "pad_token_id": tokenizer.pad_token_id,
-    "eos_token_id": tokenizer.eos_token_id,
+    #"unk_token_id": 0,
+    "eos_token_id": tokenizer.eos_token_id
 }
-output_min_length = 4
-output_max_length = max_new_tokens
-output_length_sampler = LengthSampler(output_min_length, output_max_length)
-#generation_kwargs["length_sampler"] = output_length_sampler
 
 # Note that the last batch with sample < batch_size will be discarded
 data_loader = ppo_trainer.dataloader
@@ -203,39 +170,22 @@ for epoch, batch in tqdm(enumerate(data_loader)):
 
     response_tensors = []
     for prompt in prompt_tensors:
-        print("--- prompt")
-        print(prompt)
-
-        gen_len = output_length_sampler()
-        generation_kwargs["max_new_tokens"] = gen_len
-        print("--- gen_len: %d" % gen_len)
-        response = ppo_trainer.generate(prompt, **generation_kwargs)
-
-        print("--- response")
-        print(response)
-
+        response_with_prompt = ppo_trainer.generate(prompt, **generation_kwargs)
         # strip prompt tokens, leaving response tokens only
-        only_response = response.squeeze()[-gen_len:]
-        print("--- only_response")
-        print(only_response)
-
-        response_tensors.append(only_response)
-    #response_tensors = ppo_trainer.generate(prompt_tensors, **generation_kwargs)
+        response = response_with_prompt.squeeze()[-generation_kwargs["max_new_tokens"]:]
+        response_tensors.append(response)
     batch["response"] = [tokenizer.decode(r.squeeze(), skip_special_tokens=True, ) for r in response_tensors]
-    print("--- batch response")
-    print(batch["response"])
+    #print("--- batch response")
+    #print(batch["response"])
 
     # Compute score
     texts = [q + r for q, r in zip(batch["query"], batch["response"])]
     """
+    sent_kwargs = {"return_all_scores": True, "function_to_apply": "none", "batch_size": config.mini_batch_size}
     pipe_outputs = summarize_pipeline(texts, **sent_kwargs)
     rewards = [torch.tensor(output[1]["score"]) for output in pipe_outputs]
     """
     rewards = reward_fn(texts)
-    print("--- rewards")
-    print(rewards)
-
-    #rewards = [torch.tensor(output[1]["score"]) for output in pipe_outputs]
 
     # Run PPO step
     model.gradient_checkpointing_enable()
@@ -244,5 +194,8 @@ for epoch, batch in tqdm(enumerate(data_loader)):
     stats = ppo_trainer.step(prompt_tensors, response_tensors, rewards)
     ppo_trainer.log_stats(stats, batch, rewards)
 
-
-model.push_to_hub(f"{cfg.SFT_MODEL}-ppo")
+"""
+# push to huggingface hub
+print("Push to hub %s" % cfg.PPO_MODEL)
+model.push_to_hub(cfg.PPO_MODEL, use_auth_token=True)
+"""
