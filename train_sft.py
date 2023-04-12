@@ -1,3 +1,6 @@
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 #import evaluate
 from sft.summarize_dataset import TLDRDataset
 from transformers import (
@@ -22,6 +25,31 @@ if __name__ == "__main__":
     save_steps = 100#1000
     num_train_epochs = 5
     #random.seed(42)
+
+    """
+    # Set up the metric
+    rouge = evaluate.load("rouge")
+
+    def compute_metrics(eval_preds):
+        labels_ids = eval_preds.label_ids
+        pred_ids = eval_preds.predictions
+        pred_str = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
+        label_str = tokenizer.batch_decode(labels_ids, skip_special_tokens=True)
+        result = rouge.compute(predictions=pred_str, references=label_str)
+        return result
+
+    # Create a preprocessing function to extract out the proper logits from the model output
+    def preprocess_logits_for_metrics(logits, labels):
+        if isinstance(logits, tuple):
+            logits = logits[0]
+        return logits.argmax(dim=-1)
+    """
+
+    print("Prepare PEFT model...")
+
+    # load pretrained model in int8 precision and fine tune using low rank adaption
+    #model = AutoModelForCausalLM.from_pretrained(cfg.PT_MODEL, use_cache=False)
+    model = prepare_peft_model_for_training(cfg.PT_MODEL)
 
     print("Load dataset and tokenize...")
 
@@ -51,30 +79,7 @@ if __name__ == "__main__":
         "valid",
         max_length=max_input_length,
     )
-
-    # Set up the metric
-    rouge = evaluate.load("rouge")
-
-    def compute_metrics(eval_preds):
-        labels_ids = eval_preds.label_ids
-        pred_ids = eval_preds.predictions
-        pred_str = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
-        label_str = tokenizer.batch_decode(labels_ids, skip_special_tokens=True)
-        result = rouge.compute(predictions=pred_str, references=label_str)
-        return result
-
-    # Create a preprocessing function to extract out the proper logits from the model output
-    def preprocess_logits_for_metrics(logits, labels):
-        if isinstance(logits, tuple):
-            logits = logits[0]
-        return logits.argmax(dim=-1)
     """
-
-    print("Load pretrained model...")
-
-    # load pretrained model in int8 precision and fine tune using low rank adaption
-    #model = AutoModelForCausalLM.from_pretrained(cfg.PT_MODEL, use_cache=False)
-    model = prepare_peft_model_for_training(cfg.PT_MODEL)
 
     print("Fine tuning...")
 
@@ -101,7 +106,8 @@ if __name__ == "__main__":
         logging_steps=1,
         output_dir=output_dir,
         save_total_limit=1,
-        report_to="none"
+        #report_to="none"
+        report_to=None
     )
 
     trainer = Trainer(
@@ -114,9 +120,10 @@ if __name__ == "__main__":
         #preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False)
     )
+    model.config.use_cache = False
     trainer.train()
 
-    print("Save adapters to directory %s" % output_dir)
+    print("Save adapter layers to directory %s" % output_dir)
     model.save_pretrained(output_dir)
     """
     print("Push to hub %s" % cfg.SFT_MODEL)

@@ -15,19 +15,17 @@ from rm.reward_model import OPTRewardModel
 # tokenizer
 tokenizer = get_tokenizer(cfg.PT_MODEL)
 
-
 # dataset
 print(">> Build dataset...")
 
 
 # Note that in class TLDRDataset defined in summarize_dataset.py concatenates prompt and label when initializing
 def format_prompt(sample, max_length):
-    encodings_dict = tokenizer(sample["query"].split("TL;DR:")[0] + "\nTL;DR:",
+    encodings_dict = tokenizer(sample["query"],
                                truncation=True,
                                padding="max_length",
                                max_length=max_length,
                                add_special_tokens=False)
-    #sample["input_ids"] = torch.tensor(encodings_dict["input_ids"])
     sample["input_ids"] = encodings_dict["input_ids"]
     sample["query"] = tokenizer.decode(encodings_dict["input_ids"], skip_special_tokens=True, ).strip()
 
@@ -131,7 +129,6 @@ def get_scores(samples: List[str]):
             sub_scores = reward_model(input_ids=input_ids, attention_mask=attn_masks)
         score_list.append(sub_scores["chosen_end_scores"])
     scores = torch.cat(score_list, dim=0)
-    print(scores)
 
     return scores
 
@@ -139,9 +136,7 @@ def get_scores(samples: List[str]):
 def reward_fn(samples: List[str], **kwargs):
     original_samples = [text.split("TL;DR:")[0] + "TL;DR: " for text in samples]
     original_samples = [text + train_prompt_summary_dict[text.strip()] for text in original_samples]
-    print("--- original_scores")
     original_scores = get_scores(original_samples)
-    print("--- scores")
     scores = get_scores(samples)
     norms_scores = [score - original_score for score, original_score in zip(scores, original_scores)]
     return norms_scores
@@ -155,7 +150,6 @@ generation_kwargs = {
     #"do_sample": True,  # sample a response from top k probabilities
     "max_new_tokens": cfg.MAX_NEW_TOKENS,
     "pad_token_id": tokenizer.pad_token_id,
-    #"unk_token_id": 0,
     "eos_token_id": tokenizer.eos_token_id
 }
 
@@ -170,13 +164,12 @@ for epoch, batch in tqdm(enumerate(data_loader)):
 
     response_tensors = []
     for prompt in prompt_tensors:
-        response_with_prompt = ppo_trainer.generate(prompt, **generation_kwargs)
+        with torch.cuda.amp.autocast():
+            response_with_prompt = ppo_trainer.generate(prompt, **generation_kwargs)
         # strip prompt tokens, leaving response tokens only
         response = response_with_prompt.squeeze()[-generation_kwargs["max_new_tokens"]:]
         response_tensors.append(response)
     batch["response"] = [tokenizer.decode(r.squeeze(), skip_special_tokens=True, ) for r in response_tensors]
-    #print("--- batch response")
-    #print(batch["response"])
 
     # Compute score
     texts = [q + r for q, r in zip(batch["query"], batch["response"])]

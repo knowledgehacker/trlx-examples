@@ -29,7 +29,6 @@ class OPTRewardModel(nn.Module):
         """
         self.tokenizer = get_tokenizer(cfg.PT_MODEL)
         self.PAD_ID = self.tokenizer.pad_token_id
-        print("PAD_ID: %s" % self.PAD_ID)
 
     def forward(
         self,

@@ -1,6 +1,6 @@
 
 #PT_MODEL = "EleutherAI/gpt-j-6B"
-PT_MODEL = "facebook/opt-2.7b"#"facebook/opt-6.7b"
+PT_MODEL = "facebook/opt-2.7b"
 
 # sft model stuff
 SFT_DS_CFG = "sft/ds_config.json"

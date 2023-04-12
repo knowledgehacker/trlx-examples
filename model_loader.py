@@ -1,5 +1,10 @@
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch.utils.checkpoint as checkpoint
+from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+
+from accelerate import Accelerator
+from accelerate import infer_auto_device_map, init_empty_weights
+
 import peft
 from peft.utils.other import prepare_model_for_int8_training, _get_submodules
 from peft import LoraConfig, get_peft_model
@@ -8,19 +13,61 @@ from peft import PeftModel, PeftConfig
 
 def get_tokenizer(model_path):
     tokenizer = AutoTokenizer.from_pretrained(model_path,
-                                              padding_side='right',
+                                              #padding_side='right', # 'right' by default
                                               use_fast=False)
 
     return tokenizer
 
 
+# https://huggingface.co/blog/accelerate-large-models
+def customize_device_map(model_path):
+    config = AutoConfig.from_pretrained(model_path)
+    with init_empty_weights():
+        model = AutoModelForCausalLM.from_config(config)
+
+    device_map = infer_auto_device_map(model, no_split_module_classes=["OPTDecoderLayer"], dtype=torch.float32)
+    device_map["model.decoder.embed_tokens"] = "cpu"
+    device_map["model.decoder.embed_positions"] = "cpu"
+    device_map["model.decoder.final_layer_norm"] = "cpu"
+    for i in range(0, 10):
+        device_map["model.decoder.layers.%d" % i] = "disk"
+    for i in range(10, 32):
+        device_map["model.decoder.layers.%d" % i] = 0
+    device_map["lm_head"] = 0
+
+    return device_map
+
+
 def load_pretrained_model(model_path, return_dict=True):
+    print("Load pretrained model %s starts..." % model_path)
+    """
+    quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
+
+    device_map = customize_device_map(model_path)
+    print("device_map: %s" % device_map)
+
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        return_dict=return_dict,
+        torch_dtype=torch.float16,
+        load_in_8bit=True,
+        device_map=device_map,#"auto",#{"": Accelerator().local_process_index},
+        quantization_config=quantization_config,
+        offload_folder="offload",
+        offload_state_dict=True
+    )
+    """
+
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         return_dict=return_dict,
         load_in_8bit=True,
         device_map="auto"
     )
+
+    print("Model %s memory footprint: %d" % (model_path, model.get_memory_footprint()))
+
+    print("Load pretrained model %s finished!" % model_path)
 
     return model
 
