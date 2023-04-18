@@ -76,10 +76,20 @@ def prepare_peft_model_for_training(model_path):
     LORA_R = 4
     LORA_ALPHA = 16
     LORA_DROPOUT = 0.05
+
+    TARGET_MODULES = [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "down_proj",
+        "gate_proj",
+        "up_proj",
+    ]
+
     loraCfg = LoraConfig(
         r=LORA_R,
         lora_alpha=LORA_ALPHA,
-        target_modules=["q_proj", "v_proj"],
+        target_modules=TARGET_MODULES,
         lora_dropout=LORA_DROPOUT,
         bias="none",
         task_type="CAUSAL_LM"

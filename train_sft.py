@@ -1,5 +1,5 @@
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+import torch
+#torch.set_default_dtype(torch.float16)
 
 #import evaluate
 from sft.summarize_dataset import TLDRDataset
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     learning_rate = 1e-5
     #eval_batch_size = 1
     #eval_steps = 500
-    save_steps = 100#1000
+    save_steps = 1#1000
     num_train_epochs = 5
     #random.seed(42)
 
@@ -122,7 +122,10 @@ if __name__ == "__main__":
     )
     model.config.use_cache = False
     trainer.train()
-
+    """
+    with torch.autocast("cuda"):
+        trainer.train()
+    """
     print("Save adapter layers to directory %s" % output_dir)
     model.save_pretrained(output_dir)
     """
