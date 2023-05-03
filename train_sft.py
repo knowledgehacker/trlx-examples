@@ -12,7 +12,7 @@ from transformers import (
 )
 
 import config as cfg
-from model_loader import get_tokenizer, prepare_peft_model_for_training#, merge_adapter_layers
+from model_loader import get_tokenizer, prepare_peft_model_for_training#, _merge_adapter_layers
 
 if __name__ == "__main__":
     output_dir = cfg.SFT_CKPT_DIR
@@ -126,11 +126,5 @@ if __name__ == "__main__":
     with torch.autocast("cuda"):
         trainer.train()
     """
-    print("Save adapter layers to directory %s" % output_dir)
+    print("Checkpoint adapter layers to directory %s" % output_dir)
     model.save_pretrained(output_dir)
-    """
-    print("Push to hub %s" % cfg.SFT_MODEL)
-    # model is a PeftModel, model.base_model is a LoraModel, model.base_model.model is the underlying pre-trained model
-    sft_model = merge_adapter_layers(model, output_dir)
-    sft_model.push_to_hub(cfg.SFT_MODEL, use_auth_token=True)
-    """

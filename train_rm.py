@@ -28,10 +28,10 @@ if __name__ == "__main__":
 
     print("Load fine-tuned model and initialize reward model using it...")
 
-    # Initialize the reward model from the (supervised) fine-tuned GPT-J
+    # Initialize the reward model from the (supervised) fine-tuned model
     #model = OPTRewardModel(cfg.SFT_CKPT_DIR)
-    sft_model = prepare_merged_model(cfg.SFT_CKPT_DIR)
-    model = OPTRewardModel(sft_model)
+    _, merged_model = prepare_merged_model(cfg.SFT_CKPT_DIR)
+    model = OPTRewardModel(merged_model)
 
     print("Train reward model...")
 

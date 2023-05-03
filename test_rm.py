@@ -1,4 +1,5 @@
 import torch
+from torch.utils.data import DataLoader
 from rm.reward_model import OPTRewardModel
 from tqdm import tqdm
 #from transformers import AutoTokenizer
@@ -16,19 +17,17 @@ if __name__ == "__main__":
     """
     tokenizer = get_tokenizer(cfg.PT_MODEL)
 
-    sft_model = prepare_merged_model(cfg.SFT_CKPT_DIR)
-    model = OPTRewardModel(sft_model)
+    _, merged_model = prepare_merged_model(cfg.SFT_CKPT_DIR)
+    model = OPTRewardModel(merged_model)
     model.load_state_dict(torch.load(cfg.RM_CKPT_PATH))
+    #model.cuda()
     model.eval()
 
     val_pairs = create_comparison_dataset(cfg.COMPARISON_DATASET, 10, "test")
     dev_dataset = PairwiseDataset(val_pairs, tokenizer, max_length=cfg.MAX_SUM_LEN)
 
-    from torch.utils.data import DataLoader
-
     dev_dataloader = DataLoader(dev_dataset, shuffle=False, batch_size=6, collate_fn=DataCollatorReward())
-    #model.cuda()
-    #model.half()
+
     correct = 0
     #chosen_list = []
     #reject_list = []

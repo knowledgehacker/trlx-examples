@@ -20,7 +20,7 @@ def get_tokenizer(model_path):
 
 
 # https://huggingface.co/blog/accelerate-large-models
-def customize_device_map(model_path):
+def _customize_device_map(model_path):
     config = AutoConfig.from_pretrained(model_path)
     with init_empty_weights():
         model = AutoModelForCausalLM.from_config(config)
@@ -38,12 +38,12 @@ def customize_device_map(model_path):
     return device_map
 
 
-def load_pretrained_model(model_path, return_dict=True):
+def _load_pretrained_model_in_8bit(model_path, return_dict=True):
     print("Load pretrained model %s starts..." % model_path)
     """
     quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
 
-    device_map = customize_device_map(model_path)
+    device_map = _customize_device_map(model_path)
     print("device_map: %s" % device_map)
 
     model = AutoModelForCausalLM.from_pretrained(
@@ -94,14 +94,14 @@ def prepare_peft_model_for_training(model_path):
         bias="none",
         task_type="CAUSAL_LM"
     )
-    model = load_pretrained_model(model_path)
+    model = _load_pretrained_model_in_8bit(model_path)
     model = prepare_model_for_int8_training(model)
     model = get_peft_model(model, loraCfg)
 
     return model
 
 
-def load_peft_model(adapter_path):
+def _load_peft_model(adapter_path):
     peft_config = PeftConfig.from_pretrained(adapter_path)
     """
     model = AutoModelForCausalLM.from_pretrained(
@@ -111,16 +111,16 @@ def load_peft_model(adapter_path):
     )
     """
 
-    model = load_pretrained_model(peft_config.base_model_name_or_path)
+    model = _load_pretrained_model_in_8bit(peft_config.base_model_name_or_path)
 
     model = PeftModel.from_pretrained(model, adapter_path)
-    model.eval()    # TODO: is it mandatory?
+    #model.to("cuda")
 
     return model
 
 
 # TODO: merge the adapter layers into the base model’s weights, what does it mean really?
-def merge_adapter_layers(model):
+def _merge_adapter_layers(model):
     lora_model = model.base_model
     key_list = [key for key, _ in lora_model.named_modules() if "lora" not in key]
     for key in key_list:
@@ -134,9 +134,9 @@ def merge_adapter_layers(model):
 
 
 def prepare_merged_model(adapter_path):
-    model = load_peft_model(adapter_path)
+    model = _load_peft_model(adapter_path)
 
     # merge the adapter layers into the base model’s weights
-    model = merge_adapter_layers(model)
+    merged_model = _merge_adapter_layers(model)
 
-    return model
+    return model, merged_model
