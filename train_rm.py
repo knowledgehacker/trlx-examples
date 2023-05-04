@@ -26,12 +26,13 @@ if __name__ == "__main__":
     #tokenizer.pad_token = tokenizer.eos_token
     tokenizer = get_tokenizer(cfg.PT_MODEL)
 
-    print("Load fine-tuned model and initialize reward model using it...")
+    print("Load sft model and instantiate reward model using it...")
 
     # Initialize the reward model from the (supervised) fine-tuned model
     #model = OPTRewardModel(cfg.SFT_CKPT_DIR)
     _, merged_model = prepare_merged_model(cfg.SFT_CKPT_DIR)
-    model = OPTRewardModel(merged_model)
+    reward_model = OPTRewardModel(merged_model)
+    reward_model.to(cfg.device)
 
     print("Train reward model...")
 
@@ -75,7 +76,7 @@ if __name__ == "__main__":
     )
 
     trainer = Trainer(
-        model=model,
+        model=reward_model,
         args=training_args,
         train_dataset=train_dataset,
         #compute_metrics=compute_metrics,

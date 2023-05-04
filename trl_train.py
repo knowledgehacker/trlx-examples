@@ -103,7 +103,7 @@ for epoch, batch in tqdm(enumerate(data_loader)):
         # strip prompt tokens, leaving response tokens only
         response = response_with_prompt.squeeze()[-generation_kwargs["max_new_tokens"]:]
         response_tensors.append(response)
-    batch["response"] = [decode(tokenizer, r.squeeze()) for r in response_tensors]
+    batch["response"] = [decode(tokenizer, response) for response in response_tensors]
 
     # Compute score
     texts = [q + r for q, r in zip(batch["query"], batch["response"])]
