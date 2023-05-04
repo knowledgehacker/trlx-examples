@@ -23,6 +23,7 @@ model = AutoModelForCausalLMWithValueHead.from_pretrained(ppo_model)
 model.eval()
 
 #reward_model = load_reward_model(merged_model)
+#reward_model.to(cfg.device)
 
 generation_kwargs = {
             # "do_sample": True,  # sample a response from top k probabilities
@@ -50,11 +51,9 @@ def inference(model, test_dataset):
         drop_last=False,
     )
     for epoch, batch in tqdm(enumerate(data_loader)):
-        prompt_tensors = batch["input_ids"]
-
-        for prompt_tensor in prompt_tensors:
+        for input_ids, attention_mask in zip(batch["input_ids"], batch["attention_mask"]):
             with torch.cuda.amp.autocast():
-                response_with_prompt = model.generate(input_ids=prompt_tensor.unsqueeze(dim=0), **generation_kwargs)
+                response_with_prompt = model.generate(input_ids=input_ids.unsqueeze(dim=0), attention_mask=attention_mask.unsqueeze(dim=0), **generation_kwargs)
             # strip prompt tokens, leaving response tokens only
             response = response_with_prompt.squeeze()[-generation_kwargs["max_new_tokens"]:]
             response = decode(tokenizer, response.squeeze())
@@ -122,3 +121,4 @@ if __name__ == "__main__":
     test_dataset, test_prompt_summary_dict = build_dataset(tokenizer, cfg.SUMMARIZATION_DATASET, 2, "test", max_input_len)
 
     df_result = inference(model, test_dataset)
+    write_result(df_result)

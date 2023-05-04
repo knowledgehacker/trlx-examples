@@ -61,8 +61,10 @@ if ppo_trainer.accelerator.num_processes == 1:
 # pipeline, TODO: build pipeline to incorporate reward function to generate reward score
 #summarize_pipeline = pipeline("summarization", model=cfg.REWARD_MODEL, device=device)
 
-
+print("Load reward model starts...")
 reward_model = load_reward_model(merged_model)
+reward_model.to(cfg.device)
+print("Load reward model finished!")
 
 
 def reward_fn(samples: List[str], **kwargs):

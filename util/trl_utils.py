@@ -56,22 +56,13 @@ def get_scores(tokenizer, reward_model, samples: List[str]):
     for i in range(0, len(samples), batch_size):
         sub_samples = samples[i: i + batch_size]
         sub_samples = ["<|startoftext|>" + chosen + "<|endoftext|>" for chosen in sub_samples]
-        """
-        encodings_dict = tokenizer(
-            sub_samples,
-            truncation=True,
-            max_length=cfg.MAX_SUM_LEN,
-            padding="max_length",
-            return_tensors="pt",
-        )
-        """
         encodings_dict = encode(tokenizer, sub_samples, cfg.MAX_SUM_LEN, return_tensors="pt")
-        input_ids = encodings_dict["input_ids"]  # .to(device)
-        attn_masks = encodings_dict["attention_mask"]  # .to(device)
+        input_ids = encodings_dict["input_ids"].to(cfg.device)
+        attention_mask = encodings_dict["attention_mask"].to(cfg.device)
         input_ids = input_ids.repeat(2, 1)
-        attn_masks = attn_masks.repeat(2, 1)
+        attention_mask = attention_mask.repeat(2, 1)
         with torch.no_grad():
-            sub_scores = reward_model(input_ids=input_ids, attention_mask=attn_masks)
+            sub_scores = reward_model(input_ids=input_ids, attention_mask=attention_mask)
         score_list.append(sub_scores["chosen_end_scores"])
     scores = torch.cat(score_list, dim=0)
 
