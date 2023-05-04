@@ -3,27 +3,41 @@ from datasets import load_dataset
 
 import config as cfg
 from model_loader import get_tokenizer, prepare_merged_model
+from util.token_utils import encode, decode
+
+max_input_len = cfg.MAX_SUM_LEN - cfg.MAX_NEW_TOKENS
 
 
-def test_batch(model, top_n):
+def test_batch(tokenizer, model, top_n):
     post_list = []
     dataset = load_dataset(cfg.SUMMARIZATION_DATASET, split="test[:%d]" % top_n)
     for sample in dataset:
         post_list.append((sample["prompt"], sample["label"]))
 
-    with torch.cuda.amp.autocast():
-        for prompt, label in post_list:
-            outputs = model.generate(**tokenizer(prompt, return_tensors="pt"), max_new_tokens=100)
-            output = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    for prompt, label in post_list:
+        with torch.cuda.amp.autocast():
+            encodings_dict = encode(tokenizer, prompt, max_input_len, return_tensors="pt")
+            response_with_prompt = model.generate(**encodings_dict, max_new_tokens=cfg.MAX_NEW_TOKENS)
+            response = response_with_prompt.squeeze()[-cfg.MAX_NEW_TOKENS:]
+            response = decode(tokenizer, response.squeeze())
             print("prompt: %s\n" % prompt)
-            print("output: %s\n" % output)
+            print("response: %s\n" % response)
             print("label: %s\n" % label)
 
 
 if __name__ == "__main__":
-    tokenizer = get_tokenizer(cfg.PT_MODEL)
-    _, merged_model = prepare_merged_model(cfg.SFT_CKPT_DIR)
+    pretrained_tokenizer = get_tokenizer(cfg.PT_MODEL)
+    sft_model, merged_model = prepare_merged_model(cfg.SFT_CKPT_DIR)
+
+    """
+    print("Test using merged_model")
     # merged_model.cuda()
     merged_model.eval()
 
-    test_batch(merged_model, 1)
+    test_batch(pretrained_tokenizer, merged_model, 1)
+    """
+    print("Test using sft_model")
+    #sft_model.cuda()
+    sft_model.eval()
+
+    test_batch(pretrained_tokenizer, sft_model, 1)

@@ -18,9 +18,11 @@ RM_DS_CFG = "rm/ds_config.json"
 REWARD_MODEL = "knowledgehacker/rm_tldr"
 # https://huggingface.co/datasets/CarperAI/openai_summarize_comparisons
 COMPARISON_DATASET = "CarperAI/openai_summarize_comparisons"
-RM_CKPT_DIR = "/content/rm/checkpoint"
+RM_CKPT_DIR = "/content/checkpoint/rm"
 
-# load reward model from HuggingFace hub
+# load reward model from HuggingFace hub or local directory
 RM_CKPT_PATH = "%s/pytorch_model.bin" % RM_CKPT_DIR
 
 PPO_MODEL = "knowledgehacker/ppo_tldr"
+PPO_CKPT_DIR = "/content/checkpoint/ppo"
+

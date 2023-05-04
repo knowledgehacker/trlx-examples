@@ -38,7 +38,7 @@ def _customize_device_map(model_path):
     return device_map
 
 
-def _load_pretrained_model_in_8bit(model_path, return_dict=True):
+def load_pretrained_model_in_8bit(model_path, return_dict=True):
     print("Load pretrained model %s starts..." % model_path)
     """
     quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
@@ -62,6 +62,7 @@ def _load_pretrained_model_in_8bit(model_path, return_dict=True):
         model_path,
         return_dict=return_dict,
         load_in_8bit=True,
+        torch_dtype=torch.float16,
         device_map="auto"
     )
 
@@ -72,11 +73,11 @@ def _load_pretrained_model_in_8bit(model_path, return_dict=True):
     return model
 
 
-def prepare_peft_model_for_training(model_path):
+def prepare_peft_model_for_training(model):
     LORA_R = 4
     LORA_ALPHA = 16
     LORA_DROPOUT = 0.05
-
+    """
     TARGET_MODULES = [
         "q_proj",
         "k_proj",
@@ -84,6 +85,11 @@ def prepare_peft_model_for_training(model_path):
         "down_proj",
         "gate_proj",
         "up_proj",
+    ]
+    """
+    TARGET_MODULES = [
+        "q_proj",
+        "v_proj",
     ]
 
     loraCfg = LoraConfig(
@@ -94,15 +100,15 @@ def prepare_peft_model_for_training(model_path):
         bias="none",
         task_type="CAUSAL_LM"
     )
-    model = _load_pretrained_model_in_8bit(model_path)
     model = prepare_model_for_int8_training(model)
-    model = get_peft_model(model, loraCfg)
+    peft_model = get_peft_model(model, loraCfg)
 
-    return model
+    return peft_model
 
 
-def _load_peft_model(adapter_path):
+def load_peft_model(adapter_path):
     peft_config = PeftConfig.from_pretrained(adapter_path)
+    model = load_pretrained_model_in_8bit(peft_config.base_model_name_or_path)
     """
     model = AutoModelForCausalLM.from_pretrained(
         peft_config.base_model_name_or_path,
@@ -110,17 +116,14 @@ def _load_peft_model(adapter_path):
         torch_dtype=torch.float16,
     )
     """
+    peft_model = PeftModel.from_pretrained(model, adapter_path)
+    #peft_model.to("cuda")
 
-    model = _load_pretrained_model_in_8bit(peft_config.base_model_name_or_path)
-
-    model = PeftModel.from_pretrained(model, adapter_path)
-    #model.to("cuda")
-
-    return model
+    return peft_model
 
 
 # TODO: merge the adapter layers into the base model’s weights, what does it mean really?
-def _merge_adapter_layers(model):
+def merge_adapter_layers(model):
     lora_model = model.base_model
     key_list = [key for key, _ in lora_model.named_modules() if "lora" not in key]
     for key in key_list:
@@ -134,9 +137,10 @@ def _merge_adapter_layers(model):
 
 
 def prepare_merged_model(adapter_path):
-    model = _load_peft_model(adapter_path)
+    peft_model = load_peft_model(adapter_path)
+    peft_model.eval()    # TODO: is is correct?
 
     # merge the adapter layers into the base model’s weights
-    merged_model = _merge_adapter_layers(model)
+    merged_model = merge_adapter_layers(peft_model)
 
-    return model, merged_model
+    return peft_model, merged_model

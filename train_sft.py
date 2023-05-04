@@ -12,7 +12,7 @@ from transformers import (
 )
 
 import config as cfg
-from model_loader import get_tokenizer, prepare_peft_model_for_training#, _merge_adapter_layers
+from model_loader import get_tokenizer, load_pretrained_model_in_8bit, prepare_peft_model_for_training#, _merge_adapter_layers
 
 if __name__ == "__main__":
     output_dir = cfg.SFT_CKPT_DIR
@@ -49,7 +49,8 @@ if __name__ == "__main__":
 
     # load pretrained model in int8 precision and fine tune using low rank adaption
     #model = AutoModelForCausalLM.from_pretrained(cfg.PT_MODEL, use_cache=False)
-    model = prepare_peft_model_for_training(cfg.PT_MODEL)
+    pretrained_model = load_pretrained_model_in_8bit(cfg.PT_MODEL)
+    peft_model = prepare_peft_model_for_training(pretrained_model)
 
     print("Load dataset and tokenize...")
 
@@ -111,7 +112,7 @@ if __name__ == "__main__":
     )
 
     trainer = Trainer(
-        model=model,
+        model=peft_model,
         args=training_args,
         train_dataset=train_dataset,#train_dataset,
         #eval_dataset=dev_dataset,
@@ -120,11 +121,11 @@ if __name__ == "__main__":
         #preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False)
     )
-    model.config.use_cache = False
+    peft_model.config.use_cache = False
     trainer.train()
     """
     with torch.autocast("cuda"):
         trainer.train()
     """
     print("Checkpoint adapter layers to directory %s" % output_dir)
-    model.save_pretrained(output_dir)
+    peft_model.save_pretrained(output_dir)
