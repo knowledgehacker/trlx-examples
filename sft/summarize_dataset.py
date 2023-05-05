@@ -1,13 +1,14 @@
-import json
+#import json
 
 import torch
-#torch.set_default_dtype(torch.float16)
-from datasets import load_dataset
 from torch.utils.data import Dataset
+from tqdm import tqdm
+
+from datasets import load_dataset
 
 from util.token_utils import encode
 
-
+"""
 def get_dataset_from_jsonl(jsonl_file, return_summary=True):
     # if return_summary is True, return a list of posts with summary concatenated
     # if return_summary is False, return a list of posts and a list of summaries
@@ -25,32 +26,36 @@ def get_dataset_from_jsonl(jsonl_file, return_summary=True):
     if not return_summary:
         return post_list, summary_list
     return post_list
+"""
+
+
+def create_summarization_dataset(path, top_n, split):
+    dataset = load_dataset(path, split="%s[:%d]" % (split, top_n))
+
+    posts = []
+    for sample in tqdm(dataset):
+        posts.append(sample["prompt"] + sample["label"])
+    if "valid" in split:
+        posts = posts[0:2000]
+
+    return posts
 
 
 class TLDRDataset(Dataset):
-    def __init__(self, train_path, top_n, tokenizer, split, max_length):
-        self.post_list = []
-        dataset = load_dataset(train_path, split="%s[:%d]" % (split, top_n))
-        for sample in dataset:
-            self.post_list.append(sample["prompt"] + sample["label"])
-        if "valid" in split:
-            self.post_list = self.post_list[0:2000]
-        self.tokenizer = tokenizer
-        self.max_length = max_length
+    def __init__(self, posts, tokenizer, max_length):
         self.input_ids = []
-        self.attn_masks = []
+        self.attention_mask = []
+        for post in tqdm(posts):
+            encodings_dict = encode(tokenizer, post, max_length=max_length, return_tensors="pt")
+            self.input_ids.append(encodings_dict["input_ids"][0])
+            self.attention_mask.append(encodings_dict["attention_mask"][0])
 
     def __len__(self):
-        return len(self.post_list)
+        return len(self.input_ids)
 
     def __getitem__(self, idx):
-        post = self.post_list[idx]
-        encodings_dict = encode(self.tokenizer, post, max_length=self.max_length, return_tensors="pt")
-        input_ids = encodings_dict["input_ids"][0]
-        attn_masks = encodings_dict["attention_mask"][0]
-
         return {
-            "input_ids": input_ids,
-            "attention_mask": attn_masks,
-            "labels": input_ids,
+            "input_ids": self.input_ids[idx],
+            "attention_mask": self.attention_mask[idx],
+            "labels": self.input_ids[idx], # TODO: why "labels" is self.input_ids
         }

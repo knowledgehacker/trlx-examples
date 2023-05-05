@@ -2,7 +2,7 @@ import torch
 #torch.set_default_dtype(torch.float16)
 
 #import evaluate
-from sft.summarize_dataset import TLDRDataset
+from sft.summarize_dataset import create_summarization_dataset, TLDRDataset
 from transformers import (
     #AutoTokenizer,
     Trainer,
@@ -46,21 +46,20 @@ if __name__ == "__main__":
     """
     tokenizer = get_tokenizer(cfg.PT_MODEL)
 
+    # TODO: can we access summarization data in batch???
     # Set up the datasets
+    train_posts = create_summarization_dataset(cfg.SUMMARIZATION_DATASET, 10000, "train")
     train_dataset = TLDRDataset(
-        cfg.SUMMARIZATION_DATASET,
-        5000,
+        train_posts,
         tokenizer,
-        "train",
         max_length=cfg.MAX_SUM_LEN,
     )
     """
-    dev_dataset = TLDRDataset(
-        cfg.SUMMARIZATION_DATASET,
-        1000,
+    valid_posts = create_summarization_dataset(cfg.SUMMARIZATION_DATASET, 1000, "valid")
+    valid_dataset = TLDRDataset(
+        valid_posts,
         tokenizer,
-        "valid",
-        max_length=max_input_length,
+        max_length=cfg.MAX_SUM_LEN,
     )
     """
 
@@ -75,7 +74,7 @@ if __name__ == "__main__":
 
     output_dir = cfg.SFT_CKPT_DIR
 
-    batch_size = 32
+    batch_size = 16
     mini_batch_size = 8
     gradient_accumulation_steps = batch_size // mini_batch_size
 
@@ -95,10 +94,10 @@ if __name__ == "__main__":
         warmup_steps=100,
         gradient_accumulation_steps=gradient_accumulation_steps,
         save_strategy="steps",
-        save_steps=30,#1000,
+        save_steps=50,#1000,
         # eval_steps=500,
         #load_best_model_at_end=True,
-        logging_steps=30,
+        logging_steps=50,
         save_total_limit=1,
         report_to=None#"none",
         # deepspeed=cfg.SFT_DS_CFG
@@ -108,7 +107,7 @@ if __name__ == "__main__":
         model=peft_model,
         args=training_args,
         train_dataset=train_dataset,
-        #eval_dataset=dev_dataset,
+        #eval_dataset=valid_dataset,
         #compute_metrics=compute_metrics,
         #data_collator=default_data_collator,
         #preprocess_logits_for_metrics=preprocess_logits_for_metrics,
