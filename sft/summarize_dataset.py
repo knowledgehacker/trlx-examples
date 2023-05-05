@@ -5,6 +5,8 @@ import torch
 from datasets import load_dataset
 from torch.utils.data import Dataset
 
+from util.token_utils import encode
+
 
 def get_dataset_from_jsonl(jsonl_file, return_summary=True):
     # if return_summary is True, return a list of posts with summary concatenated
@@ -42,10 +44,10 @@ class TLDRDataset(Dataset):
         return len(self.post_list)
 
     def __getitem__(self, idx):
-        txt = self.post_list[idx]
-        encodings_dict = self.tokenizer(txt, truncation=True, max_length=self.max_length, padding="max_length")
-        input_ids = torch.tensor(encodings_dict["input_ids"])
-        attn_masks = torch.tensor(encodings_dict["attention_mask"])
+        post = self.post_list[idx]
+        encodings_dict = encode(self.tokenizer, post, max_length=self.max_length, return_tensors="pt")
+        input_ids = encodings_dict["input_ids"][0]
+        attn_masks = encodings_dict["attention_mask"][0]
 
         return {
             "input_ids": input_ids,
