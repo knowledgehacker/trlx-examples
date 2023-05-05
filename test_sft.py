@@ -27,7 +27,7 @@ def test_batch(tokenizer, model, top_n):
 
 if __name__ == "__main__":
     pretrained_tokenizer = get_tokenizer(cfg.PT_MODEL)
-    sft_model, merged_model = prepare_merged_model(cfg.SFT_CKPT_DIR)
+    sft_model, merged_model = prepare_merged_model(cfg.SFT_MODEL_DIR)
 
     """
     print("Test using merged_model")

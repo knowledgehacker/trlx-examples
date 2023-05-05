@@ -17,7 +17,7 @@ from util.token_utils import encode, decode
 tokenizer = get_tokenizer(cfg.PT_MODEL)
 
 # model
-ppo_model, merged_model = prepare_merged_model(cfg.PPO_CKPT_DIR)
+ppo_model, merged_model = prepare_merged_model(cfg.PPO_MODEL_DIR)
 model = AutoModelForCausalLMWithValueHead.from_pretrained(ppo_model)
 #model.cuda()
 model.eval()

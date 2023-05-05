@@ -1,3 +1,5 @@
+import os
+
 from typing import List
 
 import torch
@@ -26,7 +28,7 @@ train_dataset, train_prompt_summary_dict = build_dataset(tokenizer, cfg.SUMMARIZ
 # model
 print(">> Prepare model...")
 
-sft_model, merged_model = prepare_merged_model(cfg.SFT_CKPT_DIR)
+sft_model, merged_model = prepare_merged_model(cfg.SFT_MODEL_DIR)
 model = AutoModelForCausalLMWithValueHead.from_pretrained(sft_model)
 is_peft_model = getattr(model, "is_peft_model", False)
 print("model is_peft_model: %s" % is_peft_model)
@@ -42,6 +44,8 @@ config = PPOConfig(
     mini_batch_size=2,#4,
     batch_size=2,#128,
     gradient_accumulation_steps=1,
+    ppo_epochs=50,
+    steps=200
 )
 
 # optimizer
@@ -122,9 +126,11 @@ for epoch, batch in tqdm(enumerate(data_loader)):
     ppo_trainer.log_stats(stats, batch, rewards)
 
     # TODO: why the whole model is checkpoint here, while only adapter layers are checkpoint in train_sft.py???
-    output_dir = cfg.PPO_CKPT_DIR
-    print("Checkpoint ppo model to directory %s" % output_dir)
-    model.save_pretrained(output_dir)
+    model_dir = cfg.PPO_MODEL_DIR
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+    print("Save ppo model's adapter layers to directory %s" % model_dir)
+    model.save_pretrained(model_dir)
 
 """
 # push to huggingface hub

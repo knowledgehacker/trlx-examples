@@ -43,8 +43,7 @@ def collator(data):
 
 def load_reward_model(pretrained_model):
     reward_model = OPTRewardModel(pretrained_model)
-    reward_model.load_state_dict(torch.load(cfg.RM_CKPT_PATH))
-    # reward_model.half()
+    reward_model.load_state_dict(torch.load("%s/pytorch_model.bin" % cfg.RM_MODEL_DIR))
     reward_model.eval()
 
     return reward_model
