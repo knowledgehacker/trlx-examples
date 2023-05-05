@@ -49,7 +49,7 @@ if __name__ == "__main__":
     # Set up the datasets
     train_dataset = TLDRDataset(
         cfg.SUMMARIZATION_DATASET,
-        10,
+        5000,
         tokenizer,
         "train",
         max_length=cfg.MAX_SUM_LEN,
@@ -75,8 +75,8 @@ if __name__ == "__main__":
 
     output_dir = cfg.SFT_CKPT_DIR
 
-    batch_size = 128
-    mini_batch_size = 4
+    batch_size = 32
+    mini_batch_size = 8
     gradient_accumulation_steps = batch_size // mini_batch_size
 
     # Prepare the trainer and start training
@@ -91,14 +91,14 @@ if __name__ == "__main__":
         #adam_beta1=0.9,
         #adam_beta2=0.95,
         output_dir=output_dir,
-        num_train_epochs=5,
+        num_train_epochs=1,#5,
         warmup_steps=100,
         gradient_accumulation_steps=gradient_accumulation_steps,
         save_strategy="steps",
-        save_steps=1,#1000,
+        save_steps=30,#1000,
         # eval_steps=500,
         #load_best_model_at_end=True,
-        logging_steps=1,
+        logging_steps=30,
         save_total_limit=1,
         report_to=None#"none",
         # deepspeed=cfg.SFT_DS_CFG
