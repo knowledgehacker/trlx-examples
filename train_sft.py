@@ -74,33 +74,44 @@ if __name__ == "__main__":
 
     output_dir = cfg.SFT_CKPT_DIR
 
-    batch_size = 16
-    mini_batch_size = 8
-    gradient_accumulation_steps = batch_size // mini_batch_size
-
     # Prepare the trainer and start training
     training_args = TrainingArguments(
-        learning_rate=1e-5,
-        per_device_train_batch_size=mini_batch_size,
-        #per_device_eval_batch_size=1,
-        # evaluation_strategy="steps",
-        # eval_accumulation_steps=1,
-        #gradient_checkpointing=True,
-        fp16=True,
-        #adam_beta1=0.9,
-        #adam_beta2=0.95,
         output_dir=output_dir,
-        num_train_epochs=1,#5,
-        warmup_steps=100,
-        gradient_accumulation_steps=gradient_accumulation_steps,
-        save_strategy="steps",
-        save_steps=50,#1000,
+        fp16=True,
+        half_precision_backend="cuda_amp",#"apex",
+        ### train
+        num_train_epochs=1,# 3,
+        warmup_steps=100,# lr scheduler
+        gradient_accumulation_steps=cfg.SFT_GRAD_ACCU,
+        # If True, use gradient checkpointing to save memory at the expense of slower backward pass.
+        # gradient_checkpointing=True,
+        ### evaluation
+        # evaluation_strategy="steps",
         # eval_steps=500,
+        # eval_accumulation_steps=1,
         #load_best_model_at_end=True,
+        ### logging
+        #logging_dir="./logs",# output_dir/runs/..., by default
         logging_steps=50,
-        save_total_limit=1,
-        report_to=None#"none",
+        report_to=None# "none",
         # deepspeed=cfg.SFT_DS_CFG
+    )
+    training_args.set_dataloader(
+        train_batch_size=cfg.SFT_TRAIN_MINI_BATCH_SIZE,#=per_device_train_batch_size
+        #eval_batch_size=1,#=per_device_eval_batch_size
+        num_workers=4,
+        pin_memory=True,
+    )
+    training_args.set_optimizer(
+        name="adamw_hf",#"adamw_apex_fused",
+        learning_rate=1e-5,# initial learning rate, learning rate changes according to lr scheduler during train
+        # beta1=0.9,
+        # beta2=0.95,
+    )
+    training_args.set_save(
+        strategy="steps",
+        steps=50,  # 1000,
+        total_limit=1,
     )
 
     trainer = Trainer(

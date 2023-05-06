@@ -57,27 +57,30 @@ if __name__ == "__main__":
 
     output_dir = cfg.RM_CKPT_DIR
 
-    batch_size = 128
-    mini_batch_size = 4
-    gradient_accumulation_steps = batch_size // mini_batch_size
-
     training_args = TrainingArguments(
-        learning_rate=1e-5,
-        per_device_train_batch_size=mini_batch_size,
-        #evaluation_strategy="steps",
-        #per_device_eval_batch_size=1,
-        #eval_accumulation_steps=1,
-        #eval_steps=500,
-        fp16=True,
         output_dir=output_dir,
+        fp16=True,
+        half_precision_backend="cuda_amp",
+        ### train
+        learning_rate=1e-5,
         num_train_epochs=5,
         warmup_steps=100,
-        gradient_accumulation_steps=gradient_accumulation_steps,
+        per_device_train_batch_size=cfg.RM_TRAIN_MINI_BATCH_SIZE,
+        gradient_accumulation_steps=cfg.RM_GRAD_ACCU,
+        # If True, use gradient checkpointing to save memory at the expense of slower backward pass.
+        # gradient_checkpointing=True,
+        ### evaluation
+        # per_device_eval_batch_size=1,
+        # evaluation_strategy="steps",
+        # eval_accumulation_steps=1,
+        # eval_steps=500,
+        ### save
         save_strategy="steps",
         save_steps=500,
-        logging_dir="./logs",
-        logging_steps=10,
         save_total_limit=1,
+        ### logging
+        #logging_dir="./logs",# output_dir/runs/..., by default
+        logging_steps=10,
         report_to=None#"none",
         # deepspeed=cfg.RM_DS_CFG,
     )

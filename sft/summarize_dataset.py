@@ -1,14 +1,51 @@
-#import json
-
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from datasets import load_dataset
 
+import config as cfg
 from util.token_utils import encode
 
+
+def create_summarization_dataset(path, top_n, split):
+    dataset = load_dataset(path, split="%s[:%d]" % (split, top_n), batch_size=cfg.SFT_TRAIN_BATCH_SIZE, num_proc=1)
+
+    posts = []
+    for sample in tqdm(dataset):
+        posts.append(sample["prompt"] + sample["label"])
+    if "valid" in split:
+        posts = posts[0:2000]
+
+    return posts
+
+
+class TLDRDataset(Dataset):
+    def __init__(self, posts, tokenizer, max_length):
+        self.len = len(posts)
+
+        self.input_ids = []
+        self.attention_mask = []
+        for post in tqdm(posts):
+            encodings_dict = encode(tokenizer, post, max_length=max_length, return_tensors="pt")
+            self.input_ids.append(encodings_dict["input_ids"][0])
+            self.attention_mask.append(encodings_dict["attention_mask"][0])
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, idx):
+        return {
+            "input_ids": self.input_ids[idx],
+            "attention_mask": self.attention_mask[idx],
+            "labels": self.input_ids[idx],
+        }
+
+
 """
+import json
+
+
 def get_dataset_from_jsonl(jsonl_file, return_summary=True):
     # if return_summary is True, return a list of posts with summary concatenated
     # if return_summary is False, return a list of posts and a list of summaries
@@ -27,35 +64,3 @@ def get_dataset_from_jsonl(jsonl_file, return_summary=True):
         return post_list, summary_list
     return post_list
 """
-
-
-def create_summarization_dataset(path, top_n, split):
-    dataset = load_dataset(path, split="%s[:%d]" % (split, top_n))
-
-    posts = []
-    for sample in tqdm(dataset):
-        posts.append(sample["prompt"] + sample["label"])
-    if "valid" in split:
-        posts = posts[0:2000]
-
-    return posts
-
-
-class TLDRDataset(Dataset):
-    def __init__(self, posts, tokenizer, max_length):
-        self.input_ids = []
-        self.attention_mask = []
-        for post in tqdm(posts):
-            encodings_dict = encode(tokenizer, post, max_length=max_length, return_tensors="pt")
-            self.input_ids.append(encodings_dict["input_ids"][0])
-            self.attention_mask.append(encodings_dict["attention_mask"][0])
-
-    def __len__(self):
-        return len(self.input_ids)
-
-    def __getitem__(self, idx):
-        return {
-            "input_ids": self.input_ids[idx],
-            "attention_mask": self.attention_mask[idx],
-            "labels": self.input_ids[idx], # TODO: why "labels" is self.input_ids
-        }
