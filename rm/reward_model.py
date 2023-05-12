@@ -3,7 +3,7 @@ from torch import nn
 #from transformers import AutoTokenizer, AutoModelForCausalLM
 
 import config as cfg
-from model_loader import get_tokenizer
+from util.model_utils import get_tokenizer
 
 
 class OPTRewardModel(nn.Module):

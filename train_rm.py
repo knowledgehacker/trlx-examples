@@ -2,7 +2,7 @@ import torch
 from transformers import AutoTokenizer, Trainer, TrainingArguments
 
 import config as cfg
-from model_loader import get_tokenizer, prepare_merged_model
+from util.model_utils import get_tokenizer, prepare_merged_model
 from rm.comparison_dataset import create_comparison_dataset, PairwiseDataset, DataCollatorReward
 from rm.reward_model import OPTRewardModel
 
@@ -59,7 +59,8 @@ if __name__ == "__main__":
 
     training_args = TrainingArguments(
         output_dir=output_dir,
-        fp16=True,
+        #fp16=True,
+        bf16=True,
         half_precision_backend="cuda_amp",
         ### train
         learning_rate=1e-5,

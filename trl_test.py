@@ -8,7 +8,7 @@ from tqdm import tqdm
 from trl import AutoModelForCausalLMWithValueHead
 
 import config as cfg
-from model_loader import get_tokenizer, prepare_merged_model
+from util.model_utils import get_tokenizer, prepare_merged_model
 from util.trl_utils import build_dataset, collator#, load_reward_model, get_scores
 from util.token_utils import encode, decode
 

@@ -2,7 +2,7 @@ import torch
 from datasets import load_dataset
 
 import config as cfg
-from model_loader import get_tokenizer, prepare_merged_model
+from util.model_utils import get_tokenizer, prepare_merged_model
 from util.token_utils import encode, decode
 
 max_input_len = cfg.MAX_SUM_LEN - cfg.MAX_NEW_TOKENS

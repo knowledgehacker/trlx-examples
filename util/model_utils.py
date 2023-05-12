@@ -38,6 +38,24 @@ def _customize_device_map(model_path):
     return device_map
 
 
+def load_pretrained_model(model_path, return_dict=True):
+    print("Load pretrained model \"%s\" starts..." % model_path)
+
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        return_dict=return_dict,
+        # torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,
+        device_map="auto"
+    )
+
+    print("Model %s memory footprint: %d" % (model_path, model.get_memory_footprint()))
+
+    print("Load pretrained model %s finished!" % model_path)
+
+    return model
+
+
 def load_pretrained_model_in_8bit(model_path, return_dict=True):
     print("Load pretrained model %s starts..." % model_path)
     """
@@ -62,13 +80,17 @@ def load_pretrained_model_in_8bit(model_path, return_dict=True):
         model_path,
         return_dict=return_dict,
         load_in_8bit=True,
-        torch_dtype=torch.float16,
+        #torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,
         device_map="auto"
     )
 
     print("Model %s memory footprint: %d" % (model_path, model.get_memory_footprint()))
 
     print("Load pretrained model %s finished!" % model_path)
+
+    print("Prepare model for int8 training...")
+    model = prepare_model_for_int8_training(model)
 
     return model
 
@@ -100,7 +122,6 @@ def prepare_peft_model_for_training(model):
         bias="none",
         task_type="CAUSAL_LM"
     )
-    model = prepare_model_for_int8_training(model)
     peft_model = get_peft_model(model, loraCfg)
 
     return peft_model

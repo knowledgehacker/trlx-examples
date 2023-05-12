@@ -12,7 +12,8 @@ from transformers import (
 )
 
 import config as cfg
-from model_loader import get_tokenizer, load_pretrained_model_in_8bit, prepare_peft_model_for_training#, _merge_adapter_layers
+from util.model_utils import get_tokenizer
+from util.model_utils import load_pretrained_model, load_pretrained_model_in_8bit, prepare_peft_model_for_training
 
 if __name__ == "__main__":
     """
@@ -67,7 +68,8 @@ if __name__ == "__main__":
 
     # load pretrained model in int8 precision and fine tune using low rank adaption
     #model = AutoModelForCausalLM.from_pretrained(cfg.PT_MODEL, use_cache=False)
-    pretrained_model = load_pretrained_model_in_8bit(cfg.PT_MODEL)
+    #pretrained_model = load_pretrained_model_in_8bit(cfg.PT_MODEL)
+    pretrained_model = load_pretrained_model(cfg.PT_MODEL)
     peft_model = prepare_peft_model_for_training(pretrained_model)
 
     print("Fine tuning...")
@@ -77,7 +79,8 @@ if __name__ == "__main__":
     # Prepare the trainer and start training
     training_args = TrainingArguments(
         output_dir=output_dir,
-        fp16=True,
+        #fp16=True,
+        bf16=True,
         half_precision_backend="cuda_amp",#"apex",
         ### train
         num_train_epochs=1,# 3,
@@ -104,7 +107,7 @@ if __name__ == "__main__":
     )
     training_args.set_optimizer(
         name="adamw_hf",#"adamw_apex_fused",
-        learning_rate=1e-5,# initial learning rate, learning rate changes according to lr scheduler during train
+        learning_rate=2e-5,# initial learning rate, learning rate changes according to lr scheduler during train
         # beta1=0.9,
         # beta2=0.95,
     )

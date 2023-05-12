@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 import config as cfg
 from rm.comparison_dataset import create_comparison_dataset, PairwiseDataset, DataCollatorReward
-from model_loader import get_tokenizer, prepare_merged_model
+from util.model_utils import get_tokenizer, prepare_merged_model
 from util.trl_utils import load_reward_model
 
 if __name__ == "__main__":
